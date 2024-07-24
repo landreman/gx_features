@@ -1,5 +1,7 @@
 import numpy as np
 
+from .calculations import differentiate
+
 def add_local_shear(feature_tensor, include_integral=True):
     """Adds the local shear and (optionally) the integrated local shear to the
     data."""
@@ -18,4 +20,8 @@ def add_local_shear(feature_tensor, include_integral=True):
     # z_functions: ['bmag', 'gbdrift', 'cvdrift', 'gbdrift0_over_shat', 'gds2', 'gds21_over_shat', 'gds22_over_shat_squared']
     integrated_local_shear = feature_tensor[:, :, 5] / feature_tensor[:, :, 6]
 
-    new_feature_tensor[:, :, n_quantities] = np.gradient(feature_tensor[:, :, 0], axis=1)
+    new_feature_tensor[:, :, n_quantities] = differentiate(integrated_local_shear)
+    if include_integral:
+        new_feature_tensor[:, :, -1] = integrated_local_shear
+
+    return new_feature_tensor
