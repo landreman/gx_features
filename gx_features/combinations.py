@@ -50,7 +50,8 @@ def create_masks(feature_tensor):
         masks = np.ones((n_data, n_z, 3))
         masks[:, :, 1] = feature_tensor[:, :, 1] >= 0
         masks[:, :, 2] = feature_tensor[:, :, 1] <= 0
-        
+        mask_names = ["", "gbdriftPos", "gbdriftNeg"]
+
     elif n_quantities == 7:
         # cvdrift was not removed
         masks = np.ones((n_data, n_z, 5))
@@ -58,7 +59,29 @@ def create_masks(feature_tensor):
         masks[:, :, 2] = feature_tensor[:, :, 1] <= 0
         masks[:, :, 3] = feature_tensor[:, :, 2] >= 0
         masks[:, :, 4] = feature_tensor[:, :, 2] <= 0
+        mask_names = ["", "gbdriftPos", "gbdriftNeg", "cvdriftPos", "cvdriftNeg"]
     else:
         raise ValueError(f"Wrong number of quantities in feature tensor: {n_quantities}.")
     
-    return masks
+    return masks, mask_names
+
+def make_feature_mask_combinations(feature_tensor, quantity_names, masks, mask_names):
+    n_data, n_z, n_quantities = feature_tensor.shape
+    assert masks.shape[0] == n_data
+    assert masks.shape[1] == n_z
+    n_masks = masks.shape[2]
+    mask_names_with_underscores = []
+    for mask_name in mask_names:
+        if mask_name == "":
+            mask_names_with_underscores.append("")
+        else:
+            mask_names_with_underscores.append("_" + mask_name)
+
+    feature_mask_combinations = np.zeros((n_data, n_z, n_quantities * n_masks))
+    names = []
+    for i in range(n_masks):
+        feature_mask_combinations[:, :, i * n_quantities : (i + 1) * n_quantities] = feature_tensor * masks[:, :, i][:, :, None]
+        for quantity_name in quantity_names:
+            names.append(quantity_name + mask_names_with_underscores[i])
+
+    return feature_mask_combinations, names
