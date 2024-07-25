@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 
 from gx_features.io import load
-from gx_features.combinations import add_local_shear, remove_cvdrift
+from gx_features.combinations import add_local_shear, remove_cvdrift, create_masks
 from gx_features.calculations import differentiate
 
 class Tests(unittest.TestCase):
@@ -76,3 +76,27 @@ class Tests(unittest.TestCase):
             new_feature_tensor[:, :, 6],
             differentiate(feature_tensor[:, :, 4] / feature_tensor[:, :, 5]),
         )
+
+    def test_create_masks(self):
+        data = load(True)
+        feature_tensor = data["feature_tensor"]
+        masks = create_masks(feature_tensor)
+        assert masks.shape[2] == 5
+
+        gbdrift_index = data["z_functions"].index("gbdrift")
+        cvdrift_index = data["z_functions"].index("cvdrift")
+        assert cvdrift_index > gbdrift_index
+        np.testing.assert_allclose(masks[:, :, 0], 1)
+        np.testing.assert_allclose(masks[:, :, 1], feature_tensor[:, :, gbdrift_index] >= 0)
+        np.testing.assert_allclose(masks[:, :, 2], feature_tensor[:, :, gbdrift_index] <= 0)
+        np.testing.assert_allclose(masks[:, :, 3], feature_tensor[:, :, cvdrift_index] >= 0)
+        np.testing.assert_allclose(masks[:, :, 4], feature_tensor[:, :, cvdrift_index] <= 0)
+
+        # Now repeat after removing cvdrift:
+
+        feature_tensor = remove_cvdrift(data["feature_tensor"])
+        masks = create_masks(feature_tensor)
+        assert masks.shape[2] == 3
+        np.testing.assert_allclose(masks[:, :, 0], 1)
+        np.testing.assert_allclose(masks[:, :, 1], feature_tensor[:, :, gbdrift_index] >= 0)
+        np.testing.assert_allclose(masks[:, :, 2], feature_tensor[:, :, gbdrift_index] <= 0)

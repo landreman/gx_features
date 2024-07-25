@@ -41,3 +41,24 @@ def add_local_shear(feature_tensor, include_integral=True):
         new_feature_tensor[:, :, -1] = integrated_local_shear
 
     return new_feature_tensor
+
+def create_masks(feature_tensor):
+    n_data, n_z, n_quantities = feature_tensor.shape
+
+    if n_quantities == 6:
+        # cvdrift was removed
+        masks = np.ones((n_data, n_z, 3))
+        masks[:, :, 1] = feature_tensor[:, :, 1] >= 0
+        masks[:, :, 2] = feature_tensor[:, :, 1] <= 0
+        
+    elif n_quantities == 7:
+        # cvdrift was not removed
+        masks = np.ones((n_data, n_z, 5))
+        masks[:, :, 1] = feature_tensor[:, :, 1] >= 0
+        masks[:, :, 2] = feature_tensor[:, :, 1] <= 0
+        masks[:, :, 3] = feature_tensor[:, :, 2] >= 0
+        masks[:, :, 4] = feature_tensor[:, :, 2] <= 0
+    else:
+        raise ValueError(f"Wrong number of quantities in feature tensor: {n_quantities}.")
+    
+    return masks
