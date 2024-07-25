@@ -3,6 +3,7 @@ import numpy as np
 
 from gx_features.calculations import differentiate, compute_mean_k_parallel
 
+
 class Tests(unittest.TestCase):
     def test_differentiate(self):
         n_data = 7
@@ -42,15 +43,19 @@ class Tests(unittest.TestCase):
         for j_data in range(n_data):
             np.testing.assert_allclose(
                 features[j_data, :],
-                j_data + 1, 
+                j_data + 1,
                 rtol=1e-14,
             )
 
         # Now try a sum of frequencies:
-        
+
         for j_data in range(n_data):
-            feature_tensor[j_data, :, 0] = 3 * (np.sin((j_data + 1) * z + 1) + np.sin((j_data + 2) * z + j_data))
-            feature_tensor[j_data, :, 1] = 17 * (np.cos((j_data + 1) * z - 1) + np.cos((j_data + 2) * z - j_data))
+            feature_tensor[j_data, :, 0] = 3 * (
+                np.sin((j_data + 1) * z + 1) + np.sin((j_data + 2) * z + j_data)
+            )
+            feature_tensor[j_data, :, 1] = 17 * (
+                np.cos((j_data + 1) * z - 1) + np.cos((j_data + 2) * z - j_data)
+            )
 
         features = compute_mean_k_parallel(feature_tensor)
 

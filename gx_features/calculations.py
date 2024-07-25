@@ -33,9 +33,13 @@ def compute_mean_k_parallel(data):
     k_parallel = np.arange(1, max_index)
 
     data_hat_abs2 = np.abs(data_hat) ** 2
-    mean_k_parallel = np.sum(k_parallel[None, :, None] * data_hat_abs2, axis=1) / np.sum(data_hat_abs2, axis=1)
+    mean_k_parallel = np.sum(
+        k_parallel[None, :, None] * data_hat_abs2, axis=1
+    ) / np.sum(data_hat_abs2, axis=1)
 
     # To avoid NaNs:
-    assert np.min(np.sum(data_hat_abs2, axis=1)) > 0, "Some row of data was constant so mean k|| is not defined."
+    assert (
+        np.min(np.sum(data_hat_abs2, axis=1)) > 0
+    ), "Some row of data was constant so mean k|| is not defined."
 
     return mean_k_parallel

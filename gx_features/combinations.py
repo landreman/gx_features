@@ -2,6 +2,7 @@ import numpy as np
 
 from .calculations import differentiate
 
+
 def remove_cvdrift(feature_tensor):
     """Remove the cvdrift quantity from the feature tensor."""
     # Shape of feature tensor: (n_data, n_z, n_quantities)
@@ -18,7 +19,7 @@ def remove_cvdrift(feature_tensor):
 def add_local_shear(feature_tensor, include_integral=True):
     """Adds the local shear and (optionally) the integrated local shear to the
     data.
-    
+
     If you are going to call remove_cvdrift(), it must be done before calling this function.
     """
     # Shape of feature tensor: (n_data, n_z, n_quantities)
@@ -42,6 +43,7 @@ def add_local_shear(feature_tensor, include_integral=True):
 
     return new_feature_tensor
 
+
 def create_masks(feature_tensor):
     n_data, n_z, n_quantities = feature_tensor.shape
 
@@ -61,9 +63,12 @@ def create_masks(feature_tensor):
         masks[:, :, 4] = feature_tensor[:, :, 2] <= 0
         mask_names = ["", "gbdriftPos", "gbdriftNeg", "cvdriftPos", "cvdriftNeg"]
     else:
-        raise ValueError(f"Wrong number of quantities in feature tensor: {n_quantities}.")
-    
+        raise ValueError(
+            f"Wrong number of quantities in feature tensor: {n_quantities}."
+        )
+
     return masks, mask_names
+
 
 def make_feature_mask_combinations(feature_tensor, quantity_names, masks, mask_names):
     n_data, n_z, n_quantities = feature_tensor.shape
@@ -80,8 +85,28 @@ def make_feature_mask_combinations(feature_tensor, quantity_names, masks, mask_n
     feature_mask_combinations = np.zeros((n_data, n_z, n_quantities * n_masks))
     names = []
     for i in range(n_masks):
-        feature_mask_combinations[:, :, i * n_quantities : (i + 1) * n_quantities] = feature_tensor * masks[:, :, i][:, :, None]
+        feature_mask_combinations[:, :, i * n_quantities : (i + 1) * n_quantities] = (
+            feature_tensor * masks[:, :, i][:, :, None]
+        )
         for quantity_name in quantity_names:
             names.append(quantity_name + mask_names_with_underscores[i])
 
     return feature_mask_combinations, names
+
+
+def make_feature_product_combinations(feature_tensor, names):
+    n_data, n_z, n_quantities = feature_tensor.shape
+    n_combinations = (n_quantities * (n_quantities - 1)) // 2
+    feature_product_combinations = np.zeros((n_data, n_z, n_combinations))
+    combination_names = []
+    j = 0
+    for i in range(n_quantities):
+        for k in range(i + 1, n_quantities):
+            feature_product_combinations[:, :, j] = (
+                feature_tensor[:, :, i] * feature_tensor[:, :, k]
+            )
+            combination_names.append(names[i] + "_" + names[k])
+            j += 1
+    assert j == n_combinations
+
+    return feature_product_combinations, combination_names

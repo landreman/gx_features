@@ -2,6 +2,7 @@ import pickle
 import os
 import numpy as np
 
+
 def load(test=False):
     this_dir = os.path.dirname(os.path.abspath(__file__))
     test_file_dir = os.path.join(this_dir, "..", "tests", "files")
@@ -12,7 +13,9 @@ def load(test=False):
         out_filename = os.path.join(test_file_dir, "test_data_out.pkl")
     else:
         # File with the flux tube geometries (raw features):
-        in_filename = "20240601-01-assembleFluxTubeMatrix_noShiftScale_nz96_withCvdrift.pkl"
+        in_filename = (
+            "20240601-01-assembleFluxTubeMatrix_noShiftScale_nz96_withCvdrift.pkl"
+        )
         # File with the GX heat flux
         out_filename = "20240601-01-103_gx_nfp4_production_gx_results_gradxRemoved.pkl"
 
@@ -51,6 +54,7 @@ def load(test=False):
         "z_functions": in_data["z_functions"],
     }
     return data
+
 
 def create_test_data(n=10):
     """Create a small dataset for testing, by taking the first n rows of the data."""
@@ -99,4 +103,3 @@ def create_test_data(n=10):
 
     with open(test_out_filename, "wb") as f:
         pickle.dump(out_data, f)
-
