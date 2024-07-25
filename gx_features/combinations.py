@@ -16,7 +16,7 @@ def remove_cvdrift(feature_tensor):
     return new_feature_tensor
 
 
-def add_local_shear(feature_tensor, include_integral=True):
+def add_local_shear(feature_tensor, names, include_integral=True):
     """Adds the local shear and (optionally) the integrated local shear to the
     data.
 
@@ -29,8 +29,10 @@ def add_local_shear(feature_tensor, include_integral=True):
     n_data, n_z, n_quantities = feature_tensor.shape
 
     n_quantities_new = n_quantities + 1
+    names += ["localShear"]
     if include_integral:
         n_quantities_new += 1
+        names += ["integratedLocalShear"]
 
     new_feature_tensor = np.zeros((n_data, n_z, n_quantities_new))
     new_feature_tensor[:, :, :n_quantities] = feature_tensor
@@ -41,7 +43,7 @@ def add_local_shear(feature_tensor, include_integral=True):
     if include_integral:
         new_feature_tensor[:, :, -1] = integrated_local_shear
 
-    return new_feature_tensor
+    return new_feature_tensor, names
 
 
 def create_masks(feature_tensor):
