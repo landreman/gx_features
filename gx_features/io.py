@@ -6,6 +6,7 @@ import numpy as np
 def load(test=False):
     this_dir = os.path.dirname(os.path.abspath(__file__))
     test_file_dir = os.path.join(this_dir, "..", "tests", "files")
+    data_dir = "/Users/mattland/Box/work24"
     if test:
         # File with the flux tube geometries (raw features):
         in_filename = os.path.join(test_file_dir, "test_data_in.pkl")
@@ -13,11 +14,11 @@ def load(test=False):
         out_filename = os.path.join(test_file_dir, "test_data_out.pkl")
     else:
         # File with the flux tube geometries (raw features):
-        in_filename = (
+        in_filename = os.path.join(data_dir, 
             "20240601-01-assembleFluxTubeMatrix_noShiftScale_nz96_withCvdrift.pkl"
         )
         # File with the GX heat flux
-        out_filename = "20240601-01-103_gx_nfp4_production_gx_results_gradxRemoved.pkl"
+        out_filename = os.path.join(data_dir, "20240601-01-103_gx_nfp4_production_gx_results_gradxRemoved.pkl")
 
     with open(in_filename, "rb") as f:
         in_data = pickle.load(f)

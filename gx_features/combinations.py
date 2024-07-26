@@ -112,3 +112,30 @@ def make_feature_product_combinations(feature_tensor, names):
     assert j == n_combinations
 
     return feature_product_combinations, combination_names
+
+# def combine_features(tensor1, names1, tensor2, names2):
+#     n_data, n_z, n_quantities1 = tensor1.shape
+#     n_data2, n_z2, n_quantities2 = tensor2.shape
+#     assert n_data == n_data2
+#     assert n_z == n_z2
+
+#     combined_tensor = np.concatenate((tensor1, tensor2), axis=2)
+#     combined_names = names1 + names2
+
+#     return combined_tensor, combined_names
+
+
+def combine_tensors(*args):
+    assert len(args) % 2 == 0, "combine_features must have an even number of arguments: tensor1, names1, tensor2, names2, etc"
+    tensors = args[::2]
+    names = args[1::2]
+    n_data, n_z, n_quantities1 = tensors[0].shape
+    for tensor in tensors:
+        n_data2, n_z2, n_quantities2 = tensor.shape
+        assert n_data == n_data2
+        assert n_z == n_z2
+
+    combined_tensor = np.concatenate(tensors, axis=2)
+    combined_names = sum(names, start=[])
+
+    return combined_tensor, combined_names
