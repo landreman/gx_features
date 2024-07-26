@@ -3,6 +3,7 @@ from pandas import DataFrame
 from tsfresh import extract_features
 
 from .io import load_tensor
+from .calculations import compute_mean_k_parallel
 from .combinations import (
     add_local_shear,
     create_masks,
@@ -10,7 +11,7 @@ from .combinations import (
     make_feature_product_combinations,
     combine_tensors,
 )
-from .utils import tensor_to_tsfresh_dataframe
+from .utils import tensor_to_tsfresh_dataframe, drop_nearly_constant_features
 
 
 def create_tensors_20240725_01(test=False):
@@ -86,7 +87,7 @@ def create_features_20240726_01(test=False):
     number_crossing_m_params = [{"m": m} for m in np.arange(-2, 2.5, 0.5)]
     print("number_crossing_m_params:", number_crossing_m_params)
 
-    curated_tsfresh_features = {
+    tsfresh_features_for_single_quantities = {
         "count_above": count_above_params,
         "fft_coefficient": fft_coefficients,
         "large_standard_deviation": large_standard_deviation_params,
@@ -147,13 +148,56 @@ def create_features_20240726_01(test=False):
     single_quantity_df = tensor_to_tsfresh_dataframe(
         single_quantity_tensor, single_quantity_names
     )
-    extracted_features1 = extract_features(
+    extracted_features_single_quantities = extract_features(
         single_quantity_df,
         column_id="j_tube",
         column_sort="z",
-        default_fc_parameters=curated_tsfresh_features,
+        default_fc_parameters=tsfresh_features_for_single_quantities,
     )
     print(
         "Number of tsfresh features from single quantities:",
-        len(extracted_features1.columns),
+        len(extracted_features_single_quantities.columns),
     )
+
+    custom_features_array, custom_features_names = compute_mean_k_parallel(single_quantity_tensor, single_quantity_names)
+    custom_features_df = DataFrame(custom_features_array, columns=custom_features_names)
+    print("Number of custom features:", len(custom_features_names))
+
+    # Now extract a smaller number of features from the masked combinations of quantities:
+
+    tsfresh_features_for_combinations = {
+        # "count_above": count_above_params,
+        # "fft_coefficient": fft_coefficients,
+        # "large_standard_deviation": large_standard_deviation_params,
+        "maximum": None,
+        "mean": None,
+        # "mean_n_absolute_max": mean_n_absolute_max_params,
+        "median": None,
+        "minimum": None,
+    }
+    combinations_df = tensor_to_tsfresh_dataframe(
+        combinations_tensor, combinations_names
+    )
+    extracted_features_combinations = extract_features(
+        combinations_df,
+        column_id="j_tube",
+        column_sort="z",
+        default_fc_parameters=tsfresh_features_for_combinations,
+    )
+    print(
+        "Number of tsfresh features from combinations:",
+        len(extracted_features_combinations.columns),
+    )
+
+    # Find the features that are in the combinations but not in the single quantities:
+    different_cols = extracted_features_combinations.columns.difference(extracted_features_single_quantities.columns)
+    print("Number of features in combinations but not in single quantities:", len(different_cols))
+    extracted_features = extracted_features_single_quantities.join([custom_features_df, extracted_features_combinations[different_cols]])
+
+    print("Number of features before dropping nearly constant features:", extracted_features.shape[1])
+    features = drop_nearly_constant_features(extracted_features)
+
+    print("\n****** Final features ******\n")
+    for f in features.columns:
+        print(f)
+    print("Final number of features:", features.shape[1])

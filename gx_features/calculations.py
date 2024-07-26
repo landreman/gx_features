@@ -14,7 +14,7 @@ def differentiate(data):
     return (np.roll(data, -1, axis=1) - np.roll(data, 1, axis=1)) / (2 * dz)
 
 
-def compute_mean_k_parallel(data):
+def compute_mean_k_parallel(data, names):
     """Compute the mean k_parallel for each data point.
 
     data should have shape (n_data, n_z, n_quantities).
@@ -42,4 +42,6 @@ def compute_mean_k_parallel(data):
         np.min(np.sum(data_hat_abs2, axis=1)) > 0
     ), "Some row of data was constant so mean k|| is not defined."
 
-    return mean_k_parallel
+    kpar_names = [n + "__mean_kpar" for n in names]
+
+    return mean_k_parallel, kpar_names

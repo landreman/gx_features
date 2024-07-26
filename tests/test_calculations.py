@@ -32,13 +32,14 @@ class Tests(unittest.TestCase):
         n_z = 96
         # n_z = 16
         z = np.linspace(-np.pi, np.pi, n_z, endpoint=False)
+        names = ["foo"] * n_quantities
 
         feature_tensor = np.zeros((n_data, n_z, n_quantities))
         for j_data in range(n_data):
             feature_tensor[j_data, :, 0] = 3 * np.sin((j_data + 1) * z + 1)
             feature_tensor[j_data, :, 1] = 17 * np.cos((j_data + 1) * z - 1)
 
-        features = compute_mean_k_parallel(feature_tensor)
+        features, _ = compute_mean_k_parallel(feature_tensor, names)
 
         for j_data in range(n_data):
             np.testing.assert_allclose(
@@ -57,7 +58,7 @@ class Tests(unittest.TestCase):
                 np.cos((j_data + 1) * z - 1) + np.cos((j_data + 2) * z - j_data)
             )
 
-        features = compute_mean_k_parallel(feature_tensor)
+        features, _ = compute_mean_k_parallel(feature_tensor, names)
 
         for j_data in range(n_data):
             np.testing.assert_allclose(
