@@ -3,7 +3,7 @@ import os
 import numpy as np
 
 
-def load(test=False):
+def load_all(test=False):
     this_dir = os.path.dirname(os.path.abspath(__file__))
     test_file_dir = os.path.join(this_dir, "..", "tests", "files")
     data_dir = "/Users/mattland/Box/work24"
@@ -56,6 +56,9 @@ def load(test=False):
     }
     return data
 
+def load_tensor(test=False):
+    data = load_all(test)
+    return data["feature_tensor"], data["z_functions"]
 
 def create_test_data(n=10):
     """Create a small dataset for testing, by taking the first n rows of the data."""
