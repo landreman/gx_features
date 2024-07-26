@@ -3,11 +3,15 @@ import numpy as np
 from tsfresh import extract_features
 
 from gx_features.io import load_tensor
-from gx_features.utils import tensor_to_tsfresh_dataframe
+from gx_features.utils import (
+    tensor_to_tsfresh_dataframe,
+    make_test_dataframe,
+    drop_nearly_constant_features,
+)
 
 
 class Tests(unittest.TestCase):
-    def test_tensor_to_tsfresh_dataframe(self): 
+    def test_tensor_to_tsfresh_dataframe(self):
         feature_tensor, names = load_tensor(True)
         n_quantities = 2
         feature_tensor = feature_tensor[:, :, :n_quantities]
@@ -23,10 +27,7 @@ class Tests(unittest.TestCase):
                 df["j_tube"][j_data * n_z : (j_data + 1) * n_z],
                 j_data,
             )
-            np.testing.assert_allclose(
-                df["z"][j_data * n_z : (j_data + 1) * n_z],
-                z
-            )
+            np.testing.assert_allclose(df["z"][j_data * n_z : (j_data + 1) * n_z], z)
             for j_quantity in range(n_quantities):
                 np.testing.assert_allclose(
                     df[names[j_quantity]][j_data * n_z : (j_data + 1) * n_z],
@@ -43,8 +44,13 @@ class Tests(unittest.TestCase):
         }
 
         extracted_features = extract_features(
-            df, 
-            column_id="j_tube", 
-            column_sort="z", 
+            df,
+            column_id="j_tube",
+            column_sort="z",
             default_fc_parameters=curated_tsfresh_features,
         )
+
+    def test_drop_nearly_constant_features(self):
+        features = make_test_dataframe()
+        features2 = drop_nearly_constant_features(features)
+        assert len(features2.columns) == len(features.columns) - 2

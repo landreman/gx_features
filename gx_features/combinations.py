@@ -113,6 +113,7 @@ def make_feature_product_combinations(feature_tensor, names):
 
     return feature_product_combinations, combination_names
 
+
 # def combine_features(tensor1, names1, tensor2, names2):
 #     n_data, n_z, n_quantities1 = tensor1.shape
 #     n_data2, n_z2, n_quantities2 = tensor2.shape
@@ -126,7 +127,9 @@ def make_feature_product_combinations(feature_tensor, names):
 
 
 def combine_tensors(*args):
-    assert len(args) % 2 == 0, "combine_features must have an even number of arguments: tensor1, names1, tensor2, names2, etc"
+    assert (
+        len(args) % 2 == 0
+    ), "combine_features must have an even number of arguments: tensor1, names1, tensor2, names2, etc"
     tensors = args[::2]
     names = args[1::2]
     n_data, n_z, n_quantities1 = tensors[0].shape

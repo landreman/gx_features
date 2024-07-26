@@ -14,11 +14,14 @@ def load_all(test=False):
         out_filename = os.path.join(test_file_dir, "test_data_out.pkl")
     else:
         # File with the flux tube geometries (raw features):
-        in_filename = os.path.join(data_dir, 
-            "20240601-01-assembleFluxTubeMatrix_noShiftScale_nz96_withCvdrift.pkl"
+        in_filename = os.path.join(
+            data_dir,
+            "20240601-01-assembleFluxTubeMatrix_noShiftScale_nz96_withCvdrift.pkl",
         )
         # File with the GX heat flux
-        out_filename = os.path.join(data_dir, "20240601-01-103_gx_nfp4_production_gx_results_gradxRemoved.pkl")
+        out_filename = os.path.join(
+            data_dir, "20240601-01-103_gx_nfp4_production_gx_results_gradxRemoved.pkl"
+        )
 
     with open(in_filename, "rb") as f:
         in_data = pickle.load(f)
@@ -56,9 +59,11 @@ def load_all(test=False):
     }
     return data
 
+
 def load_tensor(test=False):
     data = load_all(test)
     return data["feature_tensor"], data["z_functions"]
+
 
 def create_test_data(n=10):
     """Create a small dataset for testing, by taking the first n rows of the data."""

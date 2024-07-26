@@ -3,7 +3,15 @@ from pandas import DataFrame
 from tsfresh import extract_features
 
 from .io import load_tensor
-from .combinations import add_local_shear, create_masks, make_feature_mask_combinations, make_feature_product_combinations, combine_tensors
+from .combinations import (
+    add_local_shear,
+    create_masks,
+    make_feature_mask_combinations,
+    make_feature_product_combinations,
+    combine_tensors,
+)
+from .utils import tensor_to_tsfresh_dataframe
+
 
 def create_tensors_20240725_01(test=False):
     raw_tensor, raw_names = load_tensor(test)
@@ -12,7 +20,9 @@ def create_tensors_20240725_01(test=False):
     masks, mask_names = create_masks(raw_tensor)
 
     # Add local shear as a feature:
-    single_quantity_tensor, single_quantity_names = add_local_shear(raw_tensor, raw_names, include_integral=False)
+    single_quantity_tensor, single_quantity_names = add_local_shear(
+        raw_tensor, raw_names, include_integral=False
+    )
 
     # Create feature-pair products:
     feature_product_tensor, feature_product_names = make_feature_product_combinations(
@@ -23,12 +33,12 @@ def create_tensors_20240725_01(test=False):
     feature_mask_tensor, feature_mask_names = make_feature_mask_combinations(
         single_quantity_tensor, single_quantity_names, masks, mask_names
     )
-    
+
     # Create feature-pair-mask combinations:
     feature_pair_mask_tensor, feature_pair_mask_names = make_feature_mask_combinations(
         feature_product_tensor, feature_product_names, masks, mask_names
     )
-    
+
     combinations_tensor, combinations_names = combine_tensors(
         feature_mask_tensor,
         feature_mask_names,
@@ -40,10 +50,21 @@ def create_tensors_20240725_01(test=False):
     for n in combinations_names:
         print(n)
 
-    return single_quantity_tensor, single_quantity_names, combinations_tensor, combinations_names
+    return (
+        single_quantity_tensor,
+        single_quantity_names,
+        combinations_tensor,
+        combinations_names,
+    )
+
 
 def create_features_20240726_01(test=False):
-    single_quantity_tensor, single_quantity_names, combinations_tensor, combinations_names = create_tensors_20240725_01(test)
+    (
+        single_quantity_tensor,
+        single_quantity_names,
+        combinations_tensor,
+        combinations_names,
+    ) = create_tensors_20240725_01(test)
 
     count_above_thresholds = np.arange(-2, 6.1, 0.5)
     count_above_params = [{"t": t} for t in count_above_thresholds]
@@ -74,8 +95,28 @@ def create_features_20240726_01(test=False):
         "mean_n_absolute_max": mean_n_absolute_max_params,
         "median": None,
         "minimum": None,
-        "quantile": [{'q': 0.1}, {'q': 0.2}, {'q': 0.3}, {'q': 0.4}, {'q': 0.6}, {'q': 0.7}, {'q': 0.8}, {'q': 0.9}],
-        "ratio_beyond_r_sigma": [{'r': 0.5}, {'r': 1}, {'r': 1.5}, {'r': 2}, {'r': 2.5}, {'r': 3}, {'r': 5}, {'r': 6}, {'r': 7}, {'r': 10}],
+        "quantile": [
+            {"q": 0.1},
+            {"q": 0.2},
+            {"q": 0.3},
+            {"q": 0.4},
+            {"q": 0.6},
+            {"q": 0.7},
+            {"q": 0.8},
+            {"q": 0.9},
+        ],
+        "ratio_beyond_r_sigma": [
+            {"r": 0.5},
+            {"r": 1},
+            {"r": 1.5},
+            {"r": 2},
+            {"r": 2.5},
+            {"r": 3},
+            {"r": 5},
+            {"r": 6},
+            {"r": 7},
+            {"r": 10},
+        ],
         "variance": None,
     }
     # Other features to consider:
@@ -87,7 +128,6 @@ def create_features_20240726_01(test=False):
     # "fft_coefficient" with coefficients other than 1
     # "root_mean_square": None,
     # "count_above_mean": None,
-
 
     # abs_energy: This is identical to the autocorrelation at lag 0.
     # absolute_sum_of_changes: Not perfectly translation-invariant but nearly so
@@ -104,9 +144,16 @@ def create_features_20240726_01(test=False):
     # standard_deviation: probably don't need both this and variance.
     # variance_larger_than_standard_deviation: unclear what this is for.
 
-    extracted_features = extract_features(
-        df, 
-        column_id="j_tube", 
-        column_sort="z", 
+    single_quantity_df = tensor_to_tsfresh_dataframe(
+        single_quantity_tensor, single_quantity_names
+    )
+    extracted_features1 = extract_features(
+        single_quantity_df,
+        column_id="j_tube",
+        column_sort="z",
         default_fc_parameters=curated_tsfresh_features,
+    )
+    print(
+        "Number of tsfresh features from single quantities:",
+        len(extracted_features1.columns),
     )

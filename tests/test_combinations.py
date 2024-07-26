@@ -30,7 +30,9 @@ class Tests(unittest.TestCase):
 
         data = load_all(True)
         feature_tensor = data["feature_tensor"]
-        new_feature_tensor, _ = add_local_shear(feature_tensor, data["z_functions"], include_integral=True)
+        new_feature_tensor, _ = add_local_shear(
+            feature_tensor, data["z_functions"], include_integral=True
+        )
         assert new_feature_tensor.shape == (data["n_data"], data["n_z"], 9)
 
         # z_functions: ['bmag', 'gbdrift', 'cvdrift', 'gbdrift0_over_shat', 'gds2', 'gds21_over_shat', 'gds22_over_shat_squared']
@@ -48,7 +50,9 @@ class Tests(unittest.TestCase):
         # Now check the case include_integral = False:
 
         feature_tensor, names = load_tensor(True)
-        new_feature_tensor, _ = add_local_shear(feature_tensor, names, include_integral=False)
+        new_feature_tensor, _ = add_local_shear(
+            feature_tensor, names, include_integral=False
+        )
         assert new_feature_tensor.shape == (data["n_data"], data["n_z"], 8)
 
         np.testing.assert_allclose(
@@ -60,7 +64,9 @@ class Tests(unittest.TestCase):
 
         data = load_all(True)
         feature_tensor = remove_cvdrift(data["feature_tensor"])
-        new_feature_tensor, _ = add_local_shear(feature_tensor, data["z_functions"], include_integral=True)
+        new_feature_tensor, _ = add_local_shear(
+            feature_tensor, data["z_functions"], include_integral=True
+        )
         assert new_feature_tensor.shape == (data["n_data"], data["n_z"], 8)
 
         # z_functions: ['bmag', 'gbdrift', 'cvdrift', 'gbdrift0_over_shat', 'gds2', 'gds21_over_shat', 'gds22_over_shat_squared']
@@ -79,7 +85,9 @@ class Tests(unittest.TestCase):
 
         feature_tensor, names = load_tensor(True)
         feature_tensor = remove_cvdrift(feature_tensor)
-        new_feature_tensor, _ = add_local_shear(feature_tensor, names, include_integral=False)
+        new_feature_tensor, _ = add_local_shear(
+            feature_tensor, names, include_integral=False
+        )
         assert new_feature_tensor.shape == (data["n_data"], data["n_z"], 7)
 
         np.testing.assert_allclose(
