@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 from pandas import read_pickle
@@ -145,10 +146,126 @@ def hyperparam_search_nested_knn(features_filename, max_n_neighbors=20):
     print("Mean R^2:", np.mean(R2s))
 
     for j in range(n_outer_splits):
-        plt.plot(n_neighbors, scores_vs_param[j], ".-")
+        plt.plot(n_neighbors, scores_vs_param[j], ".-", label=f"outer fold {j}")
 
     plt.xlabel("n_neighbors")
     plt.ylabel("R^2")
-    plt.title("K-nearest-neighbors hyperparameter search")
+    plt.title("K-nearest-neighbors - nested CV hyperparameter search")
+    plt.legend(loc=0, fontsize=6)
+    plt.figtext(
+        0.5,
+        0.005,
+        os.path.abspath(features_filename),
+        ha="center",
+        va="bottom",
+        fontsize=6,
+    )
+    plt.tight_layout()
+    plt.show()
+
+
+def hyperparam_search_ridge(features_filename):
+    data = read_pickle(features_filename)
+    Y_all = data["Y"]
+    X_all = data.drop(columns="Y")
+    # Y_all -= np.mean(Y_all)
+
+    X_train, X_test, Y_train, Y_test = train_test_split(
+        X_all, Y_all, test_size=0.2, random_state=0
+    )
+
+    alphas = 10.0 ** np.linspace(1, 3.2, 10)
+    # alphas = [100, 300]
+    param_name = "ridge__alpha"
+    param_grid = {param_name: alphas}
+    estimator = make_pipeline(StandardScaler(), Ridge())
+    grid_search = GridSearchCV(estimator, param_grid, cv=5, verbose=2)
+    grid_search.fit(X_train, Y_train)
+    print("Best alpha:", grid_search.best_params_[param_name])
+    print(f"Best R^2:        {grid_search.best_score_:.3}")
+    print(f"R^2 on test set: {grid_search.score(X_test, Y_test):.3}")
+
+    plt.semilogx(alphas, grid_search.cv_results_["mean_test_score"], ".-")
+    plt.xlabel("alpha")
+    plt.ylabel("R^2")
+    plt.title("Ridge regression - hyperparameter search")
+    plt.figtext(
+        0.5,
+        0.005,
+        os.path.abspath(features_filename),
+        ha="center",
+        va="bottom",
+        fontsize=6,
+    )
+    plt.tight_layout()
+    plt.show()
+
+
+def hyperparam_search_nested_ridge(features_filename):
+    data = read_pickle(features_filename)
+    Y_all = data["Y"].to_numpy()
+    X_all = data.drop(columns="Y").to_numpy()
+    # Y_all -= np.mean(Y_all)
+
+    n_outer_splits = 5
+    outer_folds = KFold(n_splits=n_outer_splits, shuffle=True, random_state=0)
+    alphas = 10.0 ** np.linspace(1, 3.2, 10)
+    # alphas = [100, 300]
+    param_name = "ridge__alpha"
+    param_grid = {param_name: alphas}
+    scores_vs_param = []
+    R2s = []
+    best_params = []
+    for j_outer, (train_index, test_index) in enumerate(outer_folds.split(X_all)):
+        print("#" * 80)
+        print(f"Outer fold {j_outer + 1} / {n_outer_splits}")
+        print("#" * 80)
+        print("Number of training samples:", len(train_index))
+        print("Number of test samples:", len(test_index))
+        X_train = X_all[train_index]
+        Y_train = Y_all[train_index]
+        X_test = X_all[test_index]
+        Y_test = Y_all[test_index]
+        assert len(Y_train) == X_train.shape[0]
+        assert len(Y_test) == X_test.shape[0]
+        assert len(Y_train) + len(Y_test) == len(Y_all)
+        assert len(Y_train) == len(train_index)
+        assert len(Y_test) == len(test_index)
+
+        estimator = make_pipeline(StandardScaler(), Ridge())
+        grid_search = GridSearchCV(estimator, param_grid, cv=5, verbose=2)
+        grid_search.fit(X_train, Y_train)
+
+        R2 = grid_search.score(X_test, Y_test)
+        best_param = grid_search.best_params_[param_name]
+
+        R2s.append(R2)
+        scores_vs_param.append(grid_search.cv_results_["mean_test_score"])
+        best_params.append(best_param)
+
+        print("Best n_neighbors:", best_param)
+        print(f"Best R^2:        {grid_search.best_score_:.3}")
+        print(f"R^2 on test set: {R2:.3}")
+
+    print("#" * 80)
+    print("Best parameters for each outer fold:", best_params)
+    print("R^2 for each outer fold:", R2s)
+    print("Mean R^2:", np.mean(R2s))
+
+    for j in range(n_outer_splits):
+        plt.semilogx(alphas, scores_vs_param[j], ".-", label=f"outer fold {j}")
+
+    plt.xlabel("alpha")
+    plt.ylabel("R^2")
+    plt.title("Ridge regression - nested CV hyperparameter search")
+    plt.legend(loc=0, fontsize=6)
+    plt.figtext(
+        0.5,
+        0.005,
+        os.path.abspath(features_filename),
+        ha="center",
+        va="bottom",
+        fontsize=6,
+    )
     plt.tight_layout()
     plt.show()
