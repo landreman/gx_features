@@ -162,3 +162,5 @@ cython_debug/
 #.idea/
 
 .pymon
+20240726-01-kpar_and_pair_mask_features.pkl
+20240726-01-kpar_and_pair_mask_features_test.pkl

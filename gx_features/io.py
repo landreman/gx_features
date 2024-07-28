@@ -62,7 +62,7 @@ def load_all(test=False):
 
 def load_tensor(test=False):
     data = load_all(test)
-    return data["feature_tensor"], data["z_functions"]
+    return data["feature_tensor"], data["z_functions"], data["Y"]
 
 
 def create_test_data(n=10):

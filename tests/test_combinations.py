@@ -49,7 +49,7 @@ class Tests(unittest.TestCase):
 
         # Now check the case include_integral = False:
 
-        feature_tensor, names = load_tensor(True)
+        feature_tensor, names, Y = load_tensor(True)
         new_feature_tensor, _ = add_local_shear(
             feature_tensor, names, include_integral=False
         )
@@ -83,7 +83,7 @@ class Tests(unittest.TestCase):
 
         # Now check the case include_integral = False:
 
-        feature_tensor, names = load_tensor(True)
+        feature_tensor, names, Y = load_tensor(True)
         feature_tensor = remove_cvdrift(feature_tensor)
         new_feature_tensor, _ = add_local_shear(
             feature_tensor, names, include_integral=False
@@ -132,7 +132,7 @@ class Tests(unittest.TestCase):
         )
 
     def test_feature_mask_combinations(self):
-        feature_tensor, names = load_tensor(True)
+        feature_tensor, names, Y = load_tensor(True)
         masks, mask_names = create_masks(feature_tensor)
         combinations, names = make_feature_mask_combinations(
             feature_tensor, names, masks, mask_names
@@ -188,7 +188,7 @@ class Tests(unittest.TestCase):
         assert names == names_should_be
 
     def test_make_feature_product_combinations(self):
-        feature_tensor, names = load_tensor(True)
+        feature_tensor, names, Y = load_tensor(True)
         n_quantities = 3
         feature_tensor = feature_tensor[:, :, :n_quantities]
         names = names[:n_quantities]

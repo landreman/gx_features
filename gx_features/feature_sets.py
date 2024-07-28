@@ -15,7 +15,7 @@ from .utils import tensor_to_tsfresh_dataframe, drop_nearly_constant_features
 
 
 def create_tensors_20240725_01(test=False):
-    raw_tensor, raw_names = load_tensor(test)
+    raw_tensor, raw_names, Y = load_tensor(test)
 
     # Create masks:
     masks, mask_names = create_masks(raw_tensor)
@@ -56,6 +56,7 @@ def create_tensors_20240725_01(test=False):
         single_quantity_names,
         combinations_tensor,
         combinations_names,
+        Y,
     )
 
 
@@ -65,6 +66,7 @@ def create_features_20240726_01(test=False):
         single_quantity_names,
         combinations_tensor,
         combinations_names,
+        Y,
     ) = create_tensors_20240725_01(test)
 
     count_above_thresholds = np.arange(-2, 6.1, 0.5)
@@ -172,7 +174,7 @@ def create_features_20240726_01(test=False):
         "maximum": None,
         "mean": None,
         # "mean_n_absolute_max": mean_n_absolute_max_params,
-        "median": None,
+        # "median": None,
         "minimum": None,
     }
     combinations_df = tensor_to_tsfresh_dataframe(
@@ -201,3 +203,10 @@ def create_features_20240726_01(test=False):
     for f in features.columns:
         print(f)
     print("Final number of features:", features.shape[1])
+
+    features["Y"] = Y
+
+    filename = "20240726-01-kpar_and_pair_mask_features"
+    if test:
+        filename += "_test"
+    features.to_pickle(filename + ".pkl")
