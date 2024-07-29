@@ -28,7 +28,7 @@ def tensor_to_tsfresh_dataframe(tensor, names):
 
 
 def make_test_dataframe():
-    feature_tensor, names, Y = load_tensor(True)
+    feature_tensor, names, Y = load_tensor("test")
     n_quantities = 2
     feature_tensor = feature_tensor[:, :, :n_quantities]
     names = names[:n_quantities]

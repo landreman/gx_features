@@ -14,6 +14,7 @@ from sklearn.linear_model import Ridge
 from sklearn.kernel_ridge import KernelRidge
 from sklearn.neighbors import KNeighborsRegressor
 from lightgbm import LGBMRegressor
+from xgboost import XGBRegressor
 
 
 def assess_features_quick(features_filename, randomize_Y=False):
@@ -42,20 +43,22 @@ def assess_features_quick(features_filename, randomize_Y=False):
     )
     estimator_knn = make_pipeline(StandardScaler(), KNeighborsRegressor(n_neighbors=10))
     estimator_lgbm = make_pipeline(StandardScaler(), LGBMRegressor())
+    estimator_xgb = make_pipeline(StandardScaler(), XGBRegressor())
     estimators = [
+        estimator_knn,
         estimator_ridge,
         estimator_kernel_ridge,
-        estimator_knn,
         estimator_lgbm,
+        estimator_xgb,
     ]
-    estimator_names = ["Ridge", "Kernel Ridge", "10NN", "LightGBM"]
+    estimator_names = ["10NN", "Ridge", "Kernel Ridge", "LightGBM", "XGBoost"]
     folds = KFold(n_splits=5, shuffle=True, random_state=0)
     # folds = KFold(n_splits=5, shuffle=False)
 
     original_R2s = []
     for estimator, name in zip(estimators, estimator_names):
         print(f"Cross-validation with {name}:")
-        scores = cross_val_score(estimator, X_all, Y_all, cv=folds, scoring="r2")
+        scores = cross_val_score(estimator, X_all, Y_all, cv=folds, scoring="r2", verbose=2)
         R2 = scores.mean()
         print(f"    scores:", scores)
         print(f"    R^2: {R2:.3}")

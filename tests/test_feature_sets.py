@@ -12,7 +12,7 @@ class Tests(unittest.TestCase):
             combinations_tensor,
             combinations_names,
             Y,
-        ) = create_tensors_20240725_01(test=True)
+        ) = create_tensors_20240725_01("test")
         assert len(single_quantity_names) == 8
         assert single_quantity_tensor.shape == (10, 96, 8)
         assert len(combinations_names) == 180
@@ -20,4 +20,4 @@ class Tests(unittest.TestCase):
         assert Y.shape == (10,)
 
     def test_create_features_20240726_01(self):
-        create_features_20240726_01(test=True)
+        create_features_20240726_01("test")

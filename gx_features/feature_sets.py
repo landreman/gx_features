@@ -14,8 +14,8 @@ from .combinations import (
 from .utils import tensor_to_tsfresh_dataframe, drop_nearly_constant_features
 
 
-def create_tensors_20240725_01(test=False):
-    raw_tensor, raw_names, Y = load_tensor(test)
+def create_tensors_20240725_01(dataset):
+    raw_tensor, raw_names, Y = load_tensor(dataset)
 
     # Create masks:
     masks, mask_names = create_masks(raw_tensor)
@@ -60,14 +60,14 @@ def create_tensors_20240725_01(test=False):
     )
 
 
-def create_features_20240726_01(test=False):
+def create_features_20240726_01(dataset):
     (
         single_quantity_tensor,
         single_quantity_names,
         combinations_tensor,
         combinations_names,
         Y,
-    ) = create_tensors_20240725_01(test)
+    ) = create_tensors_20240725_01(dataset)
 
     count_above_thresholds = np.arange(-2, 6.1, 0.5)
     count_above_params = [{"t": t} for t in count_above_thresholds]
@@ -207,6 +207,6 @@ def create_features_20240726_01(test=False):
     features["Y"] = Y
 
     filename = "20240726-01-kpar_and_pair_mask_features"
-    if test:
+    if dataset == "test":
         filename += "_test"
     features.to_pickle(filename + ".pkl")

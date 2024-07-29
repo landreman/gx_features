@@ -14,7 +14,7 @@ from gx_features.calculations import differentiate
 
 class Tests(unittest.TestCase):
     def test_remove_cvdrift(self):
-        data = load_all(True)
+        data = load_all("test")
         feature_tensor = data["feature_tensor"]
         new_feature_tensor = remove_cvdrift(feature_tensor)
         assert new_feature_tensor.shape == (data["n_data"], data["n_z"], 6)
@@ -28,7 +28,7 @@ class Tests(unittest.TestCase):
     def test_add_local_shear(self):
         # First check the case include_integral = True:
 
-        data = load_all(True)
+        data = load_all("test")
         feature_tensor = data["feature_tensor"]
         new_feature_tensor, _ = add_local_shear(
             feature_tensor, data["z_functions"], include_integral=True
@@ -49,7 +49,7 @@ class Tests(unittest.TestCase):
 
         # Now check the case include_integral = False:
 
-        feature_tensor, names, Y = load_tensor(True)
+        feature_tensor, names, Y = load_tensor("test")
         new_feature_tensor, _ = add_local_shear(
             feature_tensor, names, include_integral=False
         )
@@ -62,7 +62,7 @@ class Tests(unittest.TestCase):
 
         # Now repeat, after removing cvdrift:
 
-        data = load_all(True)
+        data = load_all("test")
         feature_tensor = remove_cvdrift(data["feature_tensor"])
         new_feature_tensor, _ = add_local_shear(
             feature_tensor, data["z_functions"], include_integral=True
@@ -83,7 +83,7 @@ class Tests(unittest.TestCase):
 
         # Now check the case include_integral = False:
 
-        feature_tensor, names, Y = load_tensor(True)
+        feature_tensor, names, Y = load_tensor("test")
         feature_tensor = remove_cvdrift(feature_tensor)
         new_feature_tensor, _ = add_local_shear(
             feature_tensor, names, include_integral=False
@@ -96,7 +96,7 @@ class Tests(unittest.TestCase):
         )
 
     def test_create_masks(self):
-        data = load_all(True)
+        data = load_all("test")
         feature_tensor = data["feature_tensor"]
         masks, mask_names = create_masks(feature_tensor)
         assert masks.shape[2] == 5
@@ -132,7 +132,7 @@ class Tests(unittest.TestCase):
         )
 
     def test_feature_mask_combinations(self):
-        feature_tensor, names, Y = load_tensor(True)
+        feature_tensor, names, Y = load_tensor("test")
         masks, mask_names = create_masks(feature_tensor)
         combinations, names = make_feature_mask_combinations(
             feature_tensor, names, masks, mask_names
@@ -188,7 +188,7 @@ class Tests(unittest.TestCase):
         assert names == names_should_be
 
     def test_make_feature_product_combinations(self):
-        feature_tensor, names, Y = load_tensor(True)
+        feature_tensor, names, Y = load_tensor("test")
         n_quantities = 3
         feature_tensor = feature_tensor[:, :, :n_quantities]
         names = names[:n_quantities]
