@@ -30,11 +30,12 @@ def load_all(dataset):
         )
         # File with the GX heat flux
         out_filename = os.path.join(
-            data_dir, "20240726-01-random_stellarator_equilibria_and_GX_gx_results_gradxRemoved.pkl"
+            data_dir,
+            "20240726-01-random_stellarator_equilibria_and_GX_gx_results_gradxRemoved.pkl",
         )
-    else:    
+    else:
         raise ValueError(f"Unknown dataset: {dataset}")
-    
+
     with open(in_filename, "rb") as f:
         in_data = pickle.load(f)
 
@@ -50,7 +51,7 @@ def load_all(dataset):
     n_quantities = in_data["n_quantities"]
 
     if dataset == "20240726":
-        feature_tensor = in_data["feature_tensor"]
+        feature_tensor = in_data["tensor"]
     else:
         raw_feature_matrix = in_data["matrix"]
 

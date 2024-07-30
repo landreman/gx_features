@@ -161,7 +161,9 @@ def create_features_20240726_01(dataset):
         len(extracted_features_single_quantities.columns),
     )
 
-    custom_features_array, custom_features_names = compute_mean_k_parallel(single_quantity_tensor, single_quantity_names)
+    custom_features_array, custom_features_names = compute_mean_k_parallel(
+        single_quantity_tensor, single_quantity_names
+    )
     custom_features_df = DataFrame(custom_features_array, columns=custom_features_names)
     print("Number of custom features:", len(custom_features_names))
 
@@ -192,11 +194,21 @@ def create_features_20240726_01(dataset):
     )
 
     # Find the features that are in the combinations but not in the single quantities:
-    different_cols = extracted_features_combinations.columns.difference(extracted_features_single_quantities.columns)
-    print("Number of features in combinations but not in single quantities:", len(different_cols))
-    extracted_features = extracted_features_single_quantities.join([custom_features_df, extracted_features_combinations[different_cols]])
+    different_cols = extracted_features_combinations.columns.difference(
+        extracted_features_single_quantities.columns
+    )
+    print(
+        "Number of features in combinations but not in single quantities:",
+        len(different_cols),
+    )
+    extracted_features = extracted_features_single_quantities.join(
+        [custom_features_df, extracted_features_combinations[different_cols]]
+    )
 
-    print("Number of features before dropping nearly constant features:", extracted_features.shape[1])
+    print(
+        "Number of features before dropping nearly constant features:",
+        extracted_features.shape[1],
+    )
     features = drop_nearly_constant_features(extracted_features)
 
     print("\n****** Final features ******\n")
@@ -206,7 +218,13 @@ def create_features_20240726_01(dataset):
 
     features["Y"] = Y
 
-    filename = "20240726-01-kpar_and_pair_mask_features"
     if dataset == "test":
-        filename += "_test"
+        filename += "20240601-01-kpar_and_pair_mask_features_test"
+    elif dataset == "20240601":
+        filename = "20240601-01-kpar_and_pair_mask_features"
+    elif dataset == "20240726":
+        filename = "20240726-01-kpar_and_pair_mask_features"
+    else:
+        raise ValueError(f"Unknown dataset: {dataset}")
+
     features.to_pickle(filename + ".pkl")

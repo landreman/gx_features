@@ -10,7 +10,7 @@ from sklearn.model_selection import (
     KFold,
     GridSearchCV,
 )
-from sklearn.linear_model import Ridge
+from sklearn.linear_model import Ridge, Lasso
 from sklearn.kernel_ridge import KernelRidge
 from sklearn.neighbors import KNeighborsRegressor
 from lightgbm import LGBMRegressor
@@ -58,7 +58,9 @@ def assess_features_quick(features_filename, randomize_Y=False):
     original_R2s = []
     for estimator, name in zip(estimators, estimator_names):
         print(f"Cross-validation with {name}:")
-        scores = cross_val_score(estimator, X_all, Y_all, cv=folds, scoring="r2", verbose=2)
+        scores = cross_val_score(
+            estimator, X_all, Y_all, cv=folds, scoring="r2", verbose=2
+        )
         R2 = scores.mean()
         print(f"    scores:", scores)
         print(f"    R^2: {R2:.3}")
@@ -262,6 +264,44 @@ def hyperparam_search_nested_ridge(features_filename):
     plt.ylabel("R^2")
     plt.title("Ridge regression - nested CV hyperparameter search")
     plt.legend(loc=0, fontsize=6)
+    plt.figtext(
+        0.5,
+        0.005,
+        os.path.abspath(features_filename),
+        ha="center",
+        va="bottom",
+        fontsize=6,
+    )
+    plt.tight_layout()
+    plt.show()
+
+
+def hyperparam_search_lasso(features_filename):
+    data = read_pickle(features_filename)
+    Y_all = data["Y"]
+    X_all = data.drop(columns="Y")
+    # Y_all -= np.mean(Y_all)
+
+    X_train, X_test, Y_train, Y_test = train_test_split(
+        X_all, Y_all, test_size=0.2, random_state=0
+    )
+
+    alphas = 10.0 ** np.linspace(-5, -3, 4)
+    # alphas = 10.0 ** np.linspace(1, 3.2, 10)
+    # alphas = [100, 300]
+    param_name = "lasso__alpha"
+    param_grid = {param_name: alphas}
+    estimator = make_pipeline(StandardScaler(), Lasso())
+    grid_search = GridSearchCV(estimator, param_grid, cv=5, verbose=2)
+    grid_search.fit(X_train, Y_train)
+    print("Best alpha:", grid_search.best_params_[param_name])
+    print(f"Best R^2:        {grid_search.best_score_:.3}")
+    print(f"R^2 on test set: {grid_search.score(X_test, Y_test):.3}")
+
+    plt.semilogx(alphas, grid_search.cv_results_["mean_test_score"], ".-")
+    plt.xlabel("alpha")
+    plt.ylabel("R^2")
+    plt.title("Lasso - hyperparameter search")
     plt.figtext(
         0.5,
         0.005,
