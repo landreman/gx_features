@@ -219,7 +219,7 @@ def create_features_20240726_01(dataset):
     features["Y"] = Y
 
     if dataset == "test":
-        filename += "20240601-01-kpar_and_pair_mask_features_test"
+        filename = "20240601-01-kpar_and_pair_mask_features_test"
     elif dataset == "20240601":
         filename = "20240601-01-kpar_and_pair_mask_features"
     elif dataset == "20240726":
