@@ -278,30 +278,67 @@ def hyperparam_search_nested_ridge(features_filename):
 
 def hyperparam_search_lasso(features_filename):
     data = read_pickle(features_filename)
-    Y_all = data["Y"]
-    X_all = data.drop(columns="Y")
+    Y_all = data["Y"].to_numpy()
+    X_all = data.drop(columns="Y").to_numpy()
     # Y_all -= np.mean(Y_all)
 
-    X_train, X_test, Y_train, Y_test = train_test_split(
-        X_all, Y_all, test_size=0.2, random_state=0
-    )
-
-    alphas = 10.0 ** np.linspace(-5, -3, 4)
-    # alphas = 10.0 ** np.linspace(1, 3.2, 10)
-    # alphas = [100, 300]
+    # alphas = 10.0 ** np.linspace(-5, -3, 4)
+    alphas = 10.0 ** np.linspace(-2, 0, 10)
+    # alphas = [10]
+    n_params = len(alphas)
     param_name = "lasso__alpha"
     param_grid = {param_name: alphas}
-    estimator = make_pipeline(StandardScaler(), Lasso())
-    grid_search = GridSearchCV(estimator, param_grid, cv=5, verbose=2)
-    grid_search.fit(X_train, Y_train)
-    print("Best alpha:", grid_search.best_params_[param_name])
-    print(f"Best R^2:        {grid_search.best_score_:.3}")
-    print(f"R^2 on test set: {grid_search.score(X_test, Y_test):.3}")
+    n_folds = 5
+    R2s = np.zeros((n_params, n_folds))
+    n_features_used = np.zeros((n_params, n_folds))
+    folds = KFold(n_splits=n_folds, shuffle=True, random_state=0)
+    for j_param, param in enumerate(alphas):
+        print()
+        print("#" * 80)
+        print(f"alpha = {param}  (value {j_param + 1} / {n_params})")
+        print("#" * 80)
+        for j_fold, (train_index, test_index) in enumerate(folds.split(X_all)):
+            print(f"\n --- Fold {j_fold + 1} / {n_folds} ---")
+            print("Number of training samples:", len(train_index))
+            print("Number of test samples:", len(test_index))
+            X_train = X_all[train_index]
+            Y_train = Y_all[train_index]
+            X_test = X_all[test_index]
+            Y_test = Y_all[test_index]
 
-    plt.semilogx(alphas, grid_search.cv_results_["mean_test_score"], ".-")
+            estimator = make_pipeline(StandardScaler(), Lasso(alpha=param))
+            estimator.fit(X_train, Y_train)
+            R2 = estimator.score(X_test, Y_test)
+            R2s[j_param, j_fold] = R2
+            n_nonzero_coef = sum(np.abs(estimator.named_steps["lasso"].coef_) > 1e-13)
+            print(f"R2: {R2}  n_nonzero_coef: {n_nonzero_coef}")
+            n_features_used[j_param, j_fold] = n_nonzero_coef
+
+    print("n_features_used:", n_features_used)
+    avg_R2s = np.mean(R2s, axis=1)
+    avg_n_features_used = np.mean(n_features_used, axis=1)
+
+    print("Best alpha:", alphas[np.argmax(avg_R2s)])
+    print(f"Best R^2:        {np.max(avg_R2s):.3}")
+
+    plt.figure(figsize=(6, 8))
+    nrows = 2
+    ncols = 1
+
+    plt.subplot(nrows, ncols, 1)
+    plt.errorbar(alphas, avg_R2s, yerr=np.std(R2s, axis=1), fmt=".-")
+    plt.xscale("log")
     plt.xlabel("alpha")
     plt.ylabel("R^2")
     plt.title("Lasso - hyperparameter search")
+    
+    plt.subplot(nrows, ncols, 2)
+    plt.errorbar(alphas, avg_n_features_used, yerr=np.std(n_features_used, axis=1), fmt=".-")
+    plt.xscale("log")
+    plt.xlabel("alpha")
+    plt.ylabel("# features kept")
+    plt.ylim(bottom=0)
+    
     plt.figtext(
         0.5,
         0.005,

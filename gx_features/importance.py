@@ -140,3 +140,89 @@ def plot_importances(features_filename, ridge_alpha=20, lasso_alpha=1e-3):
         plt.tight_layout()
 
     plt.show()
+
+def plot_feature_selection_1st_cut(features_filename):
+    data = read_pickle(features_filename)
+    # importance_filename = features_filename[:-4] + "_importances.pkl"
+    Y_all = data["Y"].to_numpy()
+    X_all = data.drop(columns="Y")
+    feature_names = X_all.columns
+    X_all = X_all.to_numpy()
+    n_features = X_all.shape[1]
+
+    n_features_to_try = [int(round(n)) for n in np.linspace(1, n_features, 10)]
+    n_features_to_try += [int(round(n)) for n in np.linspace(1, 60, 5)]
+    n_features_to_try += [int(round(n)) for n in np.linspace(1, 40, 10)]
+    n_features_to_try += [int(round(n)) for n in np.arange(1, 20)]
+    n_features_to_try = sorted(list(set(n_features_to_try)))
+    print("n_features_to_try:", n_features_to_try)
+    n_n_features_to_try = len(n_features_to_try)
+
+    # Find the importances, averaged over all CV folds:
+    n_folds = 5
+    folds = KFold(n_splits=n_folds, shuffle=True, random_state=0)
+    importances = np.zeros((n_folds, n_features))
+    R2s = np.zeros(n_folds)
+    for j_fold, (train_index, test_index) in enumerate(folds.split(X_all)):
+        print("#" * 80)
+        print(f"Fold {j_fold + 1} / {n_folds}")
+        print("#" * 80)
+        print("Number of training samples:", len(train_index))
+        print("Number of test samples:", len(test_index))
+        X_train = X_all[train_index]
+        Y_train = Y_all[train_index]
+        X_test = X_all[test_index]
+        Y_test = Y_all[test_index]
+
+        estimator = make_pipeline(StandardScaler(), lgb.LGBMRegressor())
+        estimator.fit(X_train, Y_train)
+        R2 = estimator.score(X_test, Y_test)
+        print("LightGBM R2:", R2)
+        R2s[j_fold] = R2
+        importances[j_fold, :] = estimator.named_steps[
+            "lgbmregressor"
+        ].booster_.feature_importance(importance_type="gain")
+
+    avg_importances = importances.mean(axis=0)
+    order = np.argsort(avg_importances)[::-1]
+
+    R2s = np.zeros(n_n_features_to_try)
+    stds = np.zeros(n_n_features_to_try)
+    for j, n_features_reduced in enumerate(n_features_to_try):
+        print("#" * 80)
+        print(f"Trying {n_features_reduced} features")
+        print("#" * 80)
+        # print("Features to keep:")
+        # for j in range(n_features_reduced):
+        #     print(feature_names[order[j]])
+        X_reduced = X_all[:, order[:n_features_reduced]]
+
+        n_folds = 5
+        folds = KFold(n_splits=n_folds, shuffle=True, random_state=0)
+        R2s_fold = np.zeros(n_folds)
+        for j_fold, (train_index, test_index) in enumerate(folds.split(X_reduced)):
+            print("#" * 80)
+            print(f"Fold {j_fold + 1} / {n_folds}")
+            print("#" * 80)
+            print("Number of training samples:", len(train_index))
+            print("Number of test samples:", len(test_index))
+            X_train = X_reduced[train_index]
+            Y_train = Y_all[train_index]
+            X_test = X_reduced[test_index]
+            Y_test = Y_all[test_index]
+
+            estimator = make_pipeline(StandardScaler(), lgb.LGBMRegressor())
+            estimator.fit(X_train, Y_train)
+            R2 = estimator.score(X_test, Y_test)
+            print("LightGBM R2:", R2)
+            R2s_fold[j_fold] = R2
+
+        R2s[j] = R2s_fold.mean()
+        stds[j] = R2s_fold.std()
+
+    plt.figure()
+    plt.errorbar(n_features_to_try, R2s, yerr=stds, fmt='.-')
+    plt.xlabel("Number of features")
+    plt.ylabel("R2")
+    plt.tight_layout()
+    plt.show()

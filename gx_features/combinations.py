@@ -72,6 +72,19 @@ def create_masks(feature_tensor):
     return masks, mask_names
 
 
+def create_threshold_masks(feature_matrix, name="gbdrift", thresholds=np.arange(-1, 1.05, 0.05)):
+    n_data, n_z = feature_matrix.shape
+    n_masks = len(thresholds)
+
+    masks = np.ones((n_data, n_z, n_masks))
+    mask_names = []
+    for i, threshold in enumerate(thresholds):
+        masks[:, :, i] = feature_matrix >= threshold
+        mask_names.append(f"{name}GtrThan{threshold:.2f}")
+
+    return masks, mask_names
+
+
 def make_feature_mask_combinations(feature_tensor, quantity_names, masks, mask_names):
     n_data, n_z, n_quantities = feature_tensor.shape
     assert masks.shape[0] == n_data
