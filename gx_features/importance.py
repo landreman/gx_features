@@ -132,8 +132,6 @@ def plot_importances(features_filename, ridge_alpha=20, lasso_alpha=1e-3):
         "feature_names": feature_names,
         "n_features": n_features,
         "R2s": R2s,
-        "shap_models": shap_models,
-        "shap_values": shap_values,
     }
     with open(importance_filename, "wb") as f:
         pickle.dump(data, f)
