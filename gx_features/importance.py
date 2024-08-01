@@ -1,6 +1,6 @@
 import pickle
 import numpy as np
-from pandas import read_pickle
+from pandas import read_pickle, DataFrame
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import make_pipeline
@@ -8,10 +8,13 @@ from sklearn.model_selection import KFold
 from sklearn.linear_model import Ridge, Lasso
 import lightgbm as lgb
 import xgboost as xgb
+import shap
 
+from .utils import drop_special_characters_from_column_names
 
 def plot_importances(features_filename, ridge_alpha=20, lasso_alpha=1e-3):
     data = read_pickle(features_filename)
+    drop_special_characters_from_column_names(data)
     importance_filename = features_filename[:-4] + "_importances.pkl"
     Y_all = data["Y"].to_numpy()
     X_all = data.drop(columns="Y")
@@ -87,6 +90,37 @@ def plot_importances(features_filename, ridge_alpha=20, lasso_alpha=1e-3):
     R2s = np.mean(R2s, axis=0)
     print("Mean R2:", R2s)
 
+    figsize = (14.5, 8.5)
+    n_features_to_plot = 40
+    # plt.rcParams.update({"font.size": 8})
+
+    # Also compute SHAP values
+    shap_models = ["lightGBM", "XGBoost"]
+    shap_values = []
+
+    scaler = StandardScaler()
+    X_all_scaled = DataFrame(scaler.fit_transform(X_all), columns=feature_names)
+
+    def plot_shap(estimator, name):
+        estimator.fit(X_all_scaled, Y_all)
+        R2 = estimator.score(X_all_scaled, Y_all)
+        print(f"{name} on whole dataset: R2 =", R2)
+        explainer = shap.TreeExplainer(estimator)
+        shap_values.append(explainer(X_all_scaled))
+
+        plt.figure(figsize=figsize)
+        shap.plots.bar(shap_values[-1], max_display=n_features_to_plot, show=False, ax=plt.gca())
+        plt.title(f"{name} SHAP values")
+        plt.tight_layout()
+
+        plt.figure(figsize=figsize)
+        shap.plots.beeswarm(shap_values[-1], max_display=n_features_to_plot, plot_size=figsize, show=False)
+        plt.title(f"{name} SHAP values")
+        plt.tight_layout()
+
+    plot_shap(lgb.LGBMRegressor(), "LightGBM")
+    plot_shap(xgb.XGBRegressor(), "XGBoost")
+
     avg_importances = np.mean(importances, axis=0)
     print("Saving importances as", importance_filename)
     data = {
@@ -98,6 +132,8 @@ def plot_importances(features_filename, ridge_alpha=20, lasso_alpha=1e-3):
         "feature_names": feature_names,
         "n_features": n_features,
         "R2s": R2s,
+        "shap_models": shap_models,
+        "shap_values": shap_values,
     }
     with open(importance_filename, "wb") as f:
         pickle.dump(data, f)
@@ -108,9 +144,6 @@ def plot_importances(features_filename, ridge_alpha=20, lasso_alpha=1e-3):
     #     for j in range(n_features):
     #         if avg_importances[j, j_importance_type] < importance_threshold:
     #             print(feature_names[j])
-
-    n_features_to_plot = 40
-    figsize = (14.5, 8.5)
 
     for j_importance_type, importance_type in enumerate(importance_types):
         print("Importance type:", importance_type)
@@ -124,7 +157,7 @@ def plot_importances(features_filename, ridge_alpha=20, lasso_alpha=1e-3):
         )
 
         plt.figure(figsize=figsize)
-        ticks = range(n_features_to_plot)
+        ticks = -np.arange(n_features_to_plot)
         plt.barh(ticks, avg_importances[order[:n_features_to_plot], j_importance_type])
         plt.yticks(ticks, [feature_names[j] for j in order[:n_features_to_plot]])
         plt.title("Most important features")
@@ -132,7 +165,7 @@ def plot_importances(features_filename, ridge_alpha=20, lasso_alpha=1e-3):
         plt.tight_layout()
 
         plt.figure(figsize=figsize)
-        ticks = range(n_features)
+        ticks = -np.arange(n_features)
         plt.barh(ticks, avg_importances[order, j_importance_type])
         plt.title("All features")
         plt.xlabel(f"{importance_type} importance")
