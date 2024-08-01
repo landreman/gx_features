@@ -12,7 +12,11 @@ from .combinations import (
     make_feature_product_combinations,
     combine_tensors,
 )
-from .utils import tensor_to_tsfresh_dataframe, drop_nearly_constant_features
+from .utils import (
+    tensor_to_tsfresh_dataframe,
+    drop_nearly_constant_features,
+    drop_special_characters_from_column_names,
+)
 
 
 def create_tensors_20240725_01(dataset):
@@ -218,6 +222,7 @@ def create_features_20240726_01(dataset):
     print("Final number of features:", features.shape[1])
 
     features["Y"] = Y
+    drop_special_characters_from_column_names(features)
 
     if dataset == "test":
         filename = "20240601-01-kpar_and_pair_mask_features_test"
@@ -239,8 +244,8 @@ def create_multithreshold_gbdrift_masked_gds22_features():
 
     index = raw_names.index("gds22_over_shat_squared")
     assert index == 5
-    raw_tensor = raw_tensor[:, :, index:index + 1]
-    raw_names = raw_names[index:index + 1]
+    raw_tensor = raw_tensor[:, :, index : index + 1]
+    raw_names = raw_names[index : index + 1]
 
     # Create masks:
     masks, mask_names = create_threshold_masks(gbdrift)
@@ -291,8 +296,10 @@ def create_multithreshold_gbdrift_masked_gds22_features():
     print("Final number of features:", features.shape[1])
 
     features["Y"] = Y
+    drop_special_characters_from_column_names(features)
 
     features.to_pickle("20240726_multithreshold_gbdrift_masked_gds22_features.pkl")
+
 
 def create_features_20240730_01():
     (
@@ -463,10 +470,12 @@ def create_features_20240730_01():
     print("Final number of features:", features.shape[1])
 
     features["Y"] = Y
+    drop_special_characters_from_column_names(features)
 
     filename = "20240726-01-kpar_and_pair_mask_features_20240730_01"
 
     features.to_pickle(filename + ".pkl")
+
 
 def create_test_features():
     raw_tensor, raw_names, Y = load_tensor("test")
@@ -482,9 +491,7 @@ def create_test_features():
         "minimum": None,
     }
 
-    single_quantity_df = tensor_to_tsfresh_dataframe(
-        raw_tensor, raw_names
-    )
+    single_quantity_df = tensor_to_tsfresh_dataframe(raw_tensor, raw_names)
     features = extract_features(
         single_quantity_df,
         column_id="j_tube",
@@ -492,6 +499,7 @@ def create_test_features():
         default_fc_parameters=tsfresh_custom_features,
     )
     features["Y"] = Y
+    drop_special_characters_from_column_names(features)
 
     filename = "test_features.pkl"
     features.to_pickle(filename)

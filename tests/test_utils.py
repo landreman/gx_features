@@ -7,6 +7,7 @@ from gx_features.utils import (
     tensor_to_tsfresh_dataframe,
     make_test_dataframe,
     drop_nearly_constant_features,
+    drop_special_characters_from_column_names,
 )
 
 
@@ -54,3 +55,26 @@ class Tests(unittest.TestCase):
         features = make_test_dataframe()
         features2 = drop_nearly_constant_features(features)
         assert len(features2.columns) == len(features.columns) - 2
+
+    def test_drop_special_characters_from_column_names(self):
+        features = make_test_dataframe()
+        features_array = features.to_numpy()
+        features_columns = features.columns
+        new_columns_should_be = [
+            x.replace('"', "")
+            .replace("(", "")
+            .replace(")", "")
+            .replace(",", "_")
+            .replace(" ", "_")
+            for x in features.columns
+        ]
+
+        drop_special_characters_from_column_names(features)
+        features2_array = features.to_numpy()
+        features2_columns = features.columns
+
+        np.testing.assert_allclose(features_array, features2_array)
+        np.testing.assert_array_equal(new_columns_should_be, features2_columns)
+        assert (
+            features_columns[-1] != features2_columns[-1]
+        )  # Last feature name should have been changed.
