@@ -1,6 +1,12 @@
+import os
 import numpy as np
-from pandas import DataFrame
+from pandas import DataFrame, read_pickle
+import matplotlib.pyplot as plt
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.feature_selection import RFE
 from tsfresh import extract_features
+import lightgbm as lgb
 
 from .io import load_tensor
 from .calculations import compute_mean_k_parallel
@@ -503,3 +509,38 @@ def create_test_features():
 
     filename = "test_features.pkl"
     features.to_pickle(filename)
+
+
+def recursive_feature_elimination(features_filename, n_features, step):
+    output_filename = features_filename[:-4] + f"_RFE{n_features}.pkl"
+    print("Results will be saved in", output_filename)
+
+    data = read_pickle(features_filename)
+    Y_all = data["Y"]
+    X_all = data.drop(columns="Y")
+    feature_names = X_all.columns
+
+    estimator = make_pipeline(
+        StandardScaler(), lgb.LGBMRegressor(importance_type="gain", force_col_wise=True)
+    )
+
+    rfe = RFE(
+        estimator,
+        step=step,
+        n_features_to_select=n_features,
+        verbose=3,
+        importance_getter="named_steps.lgbmregressor.feature_importances_",
+    )
+    rfe.fit(X_all, Y_all)
+
+    print("sum(rfe.ranking_ <= 1)", sum(rfe.ranking_ <= 1))
+    print("sum(rfe.support_)", sum(rfe.support_))
+
+    # Make a DataFrame with the selected features and save the result:
+    X_subset = X_all.to_numpy()[:, rfe.support_]
+    feature_names_subset = feature_names[rfe.support_]
+    df = DataFrame(X_subset, columns=feature_names_subset)
+    print("Size of the reduced feature set:", df.shape)
+    df["Y"] = Y_all
+    df.to_pickle(output_filename)
+    print("Results are now saved in", output_filename)

@@ -17,7 +17,7 @@ from lightgbm import LGBMRegressor
 from xgboost import XGBRegressor
 
 
-def assess_features_quick(features_filename, randomize_Y=False):
+def assess_features_quick(features_filename, randomize_Y=False, include_kernel_ridge=False):
     """
     randomize_Y is a sanity check: if we randomly permute the heat fluxes, there
     should be no true signal for the ML model to learn, so the R^2 should be close to zero.
@@ -47,11 +47,14 @@ def assess_features_quick(features_filename, randomize_Y=False):
     estimators = [
         estimator_knn,
         estimator_ridge,
-        estimator_kernel_ridge,
         estimator_lgbm,
         estimator_xgb,
     ]
-    estimator_names = ["10NN", "Ridge", "Kernel Ridge", "LightGBM", "XGBoost"]
+    estimator_names = ["10NN", "Ridge", "LightGBM", "XGBoost"]
+    if include_kernel_ridge:
+        estimators.append(estimator_kernel_ridge)
+        estimator_names.append("Kernel Ridge")
+
     folds = KFold(n_splits=5, shuffle=True, random_state=0)
     # folds = KFold(n_splits=5, shuffle=False)
 
