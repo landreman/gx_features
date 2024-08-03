@@ -17,7 +17,9 @@ from lightgbm import LGBMRegressor
 from xgboost import XGBRegressor
 
 
-def assess_features_quick(features_filename, randomize_Y=False, include_kernel_ridge=False):
+def assess_features_quick(
+    features_filename, include_kernel_ridge=False, randomize_Y=False
+):
     """
     randomize_Y is a sanity check: if we randomly permute the heat fluxes, there
     should be no true signal for the ML model to learn, so the R^2 should be close to zero.
@@ -334,14 +336,16 @@ def hyperparam_search_lasso(features_filename):
     plt.xlabel("alpha")
     plt.ylabel("R^2")
     plt.title("Lasso - hyperparameter search")
-    
+
     plt.subplot(nrows, ncols, 2)
-    plt.errorbar(alphas, avg_n_features_used, yerr=np.std(n_features_used, axis=1), fmt=".-")
+    plt.errorbar(
+        alphas, avg_n_features_used, yerr=np.std(n_features_used, axis=1), fmt=".-"
+    )
     plt.xscale("log")
     plt.xlabel("alpha")
     plt.ylabel("# features kept")
     plt.ylim(bottom=0)
-    
+
     plt.figtext(
         0.5,
         0.005,

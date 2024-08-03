@@ -9,8 +9,10 @@ from sklearn.linear_model import Ridge, Lasso
 import lightgbm as lgb
 import xgboost as xgb
 import shap
+from mlxtend.plotting import plot_sequential_feature_selection as plot_sfs
 
 from .utils import drop_special_characters_from_column_names
+
 
 def plot_importances(features_filename, ridge_alpha=20, lasso_alpha=1e-3):
     data = read_pickle(features_filename)
@@ -109,12 +111,19 @@ def plot_importances(features_filename, ridge_alpha=20, lasso_alpha=1e-3):
         shap_values.append(explainer(X_all_scaled))
 
         plt.figure(figsize=figsize)
-        shap.plots.bar(shap_values[-1], max_display=n_features_to_plot, show=False, ax=plt.gca())
+        shap.plots.bar(
+            shap_values[-1], max_display=n_features_to_plot, show=False, ax=plt.gca()
+        )
         plt.title(f"{name} SHAP values")
         plt.tight_layout()
 
         plt.figure(figsize=figsize)
-        shap.plots.beeswarm(shap_values[-1], max_display=n_features_to_plot, plot_size=figsize, show=False)
+        shap.plots.beeswarm(
+            shap_values[-1],
+            max_display=n_features_to_plot,
+            plot_size=figsize,
+            show=False,
+        )
         plt.title(f"{name} SHAP values")
         plt.tight_layout()
 
@@ -171,6 +180,7 @@ def plot_importances(features_filename, ridge_alpha=20, lasso_alpha=1e-3):
         plt.tight_layout()
 
     plt.show()
+
 
 def plot_feature_selection_1st_cut(features_filename):
     data = read_pickle(features_filename)
@@ -252,8 +262,41 @@ def plot_feature_selection_1st_cut(features_filename):
         stds[j] = R2s_fold.std()
 
     plt.figure()
-    plt.errorbar(n_features_to_try, R2s, yerr=stds, fmt='.-')
+    plt.errorbar(n_features_to_try, R2s, yerr=stds, fmt=".-")
     plt.xlabel("Number of features")
     plt.ylabel("R2")
     plt.tight_layout()
     plt.show()
+
+
+def plot_SFS_results(filename, show=True):
+    with open(filename, "rb") as file:
+        sfs = pickle.load(file)
+
+    print()
+    print(DataFrame.from_dict(sfs.get_metric_dict()).T)
+    print()
+
+    previous_features = set()
+    max_n_features = len(sfs.subsets_.keys())
+    for j in range(max_n_features):
+        features = set(sfs.subsets_[j + 1]["feature_names"])
+        new_features = features - previous_features
+        removed_features = previous_features - features
+        print(f"Step {j + 1}: Added {new_features}", end="")
+        if len(removed_features) > 0:
+            print(f", removed {removed_features}")
+        else:
+            print()
+        previous_features = features
+
+    fig1 = plot_sfs(sfs.get_metric_dict(), kind="std_dev")
+
+    plt.ylim(bottom=0)
+    plt.title("Sequential Forward Selection (w. StdDev)")
+    plt.grid()
+    plt.figtext(0.5, 0.005, filename, ha="center", va="bottom", fontsize=6)
+    plt.ylabel("R^2")
+    plt.tight_layout()
+    if show:
+        plt.show()

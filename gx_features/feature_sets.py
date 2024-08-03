@@ -1,4 +1,5 @@
 import os
+import pickle
 import numpy as np
 from pandas import DataFrame, read_pickle
 import matplotlib.pyplot as plt
@@ -544,3 +545,25 @@ def recursive_feature_elimination(features_filename, n_features, step):
     df["Y"] = Y_all
     df.to_pickle(output_filename)
     print("Results are now saved in", output_filename)
+
+
+def pick_features_from_SFS_results(sfs_file, features_file, n_features):
+    """
+    Given the results of a SequentialFeatureSelector, pick the best set of
+    n_features features out of the features in features_file, and save the
+    results in a new features file.
+    """
+    with open(sfs_file, "rb") as f:
+        sfs = pickle.load(f)
+
+    big_df = read_pickle(features_file)
+
+    best_features = sfs.subsets_[n_features]["feature_names"]
+    print("Keeping these features:\n")
+    for f in best_features:
+        print(f)
+
+    small_df = big_df[list(best_features) + ["Y"]]
+    output_filename = f"{features_file[:-4]}_SFS{n_features}.pkl"
+    print("\nSaving results in", output_filename)
+    small_df.to_pickle(output_filename)

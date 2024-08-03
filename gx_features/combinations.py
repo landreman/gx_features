@@ -72,7 +72,9 @@ def create_masks(feature_tensor):
     return masks, mask_names
 
 
-def create_threshold_masks(feature_matrix, name="gbdrift", thresholds=np.arange(-1, 1.05, 0.05)):
+def create_threshold_masks(
+    feature_matrix, name="gbdrift", thresholds=np.arange(-1, 1.05, 0.05)
+):
     n_data, n_z = feature_matrix.shape
     n_masks = len(thresholds)
 
