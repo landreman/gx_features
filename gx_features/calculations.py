@@ -114,3 +114,11 @@ def compute_longest_nonzero_interval(data, names):
                 features[j_data, j_quantity] = np.max(interval_lengths)
 
     return features, new_names
+
+def compute_max_minus_min(data, names):
+    n_data, n_z, n_quantities = data.shape
+
+    features = np.max(data, axis=1) - np.min(data, axis=1)
+    new_names = [n + "__maxMinusMin" for n in names]
+
+    return features, new_names

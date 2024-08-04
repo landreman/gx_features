@@ -13,12 +13,13 @@ from sklearn.model_selection import (
 from sklearn.linear_model import Ridge, Lasso
 from sklearn.kernel_ridge import KernelRidge
 from sklearn.neighbors import KNeighborsRegressor
+from sklearn.ensemble import RandomForestRegressor
 from lightgbm import LGBMRegressor
 from xgboost import XGBRegressor
 
 
 def assess_features_quick(
-    features_filename, include_kernel_ridge=False, randomize_Y=False
+    features_filename, include_random_forest=False, include_kernel_ridge=False, randomize_Y=False
 ):
     """
     randomize_Y is a sanity check: if we randomly permute the heat fluxes, there
@@ -44,6 +45,9 @@ def assess_features_quick(
         ),
     )
     estimator_knn = make_pipeline(StandardScaler(), KNeighborsRegressor(n_neighbors=10))
+    estimator_randomforest = make_pipeline(
+        StandardScaler(), RandomForestRegressor()
+    )
     estimator_lgbm = make_pipeline(StandardScaler(), LGBMRegressor())
     estimator_xgb = make_pipeline(StandardScaler(), XGBRegressor())
     estimators = [
@@ -53,6 +57,11 @@ def assess_features_quick(
         estimator_xgb,
     ]
     estimator_names = ["10NN", "Ridge", "LightGBM", "XGBoost"]
+    
+    if include_random_forest:
+        estimators.append(estimator_randomforest)
+        estimator_names.append("RandomForest")
+
     if include_kernel_ridge:
         estimators.append(estimator_kernel_ridge)
         estimator_names.append("Kernel Ridge")
