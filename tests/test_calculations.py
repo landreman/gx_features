@@ -1,7 +1,11 @@
 import unittest
 import numpy as np
 
-from gx_features.calculations import differentiate, compute_mean_k_parallel
+from gx_features.calculations import (
+    differentiate,
+    compute_mean_k_parallel,
+    compute_longest_nonzero_interval,
+)
 
 
 class Tests(unittest.TestCase):
@@ -83,8 +87,15 @@ class Tests(unittest.TestCase):
             raw_feature_tensor[j_data, :, 0] = 3 * np.sin((j_data + 1) * z + 1)
             raw_feature_tensor[j_data, :, 1] = 17 * np.cos((j_data + 2) * z - 1)
 
-        features, new_names = compute_mean_k_parallel(raw_feature_tensor, names, include_argmax=True)
-        assert new_names == ["foo__mean_kpar", "bar__mean_kpar", "foo__argmax_kpar", "bar__argmax_kpar"]
+        features, new_names = compute_mean_k_parallel(
+            raw_feature_tensor, names, include_argmax=True
+        )
+        assert new_names == [
+            "foo__mean_kpar",
+            "bar__mean_kpar",
+            "foo__argmax_kpar",
+            "bar__argmax_kpar",
+        ]
 
         for j_data in range(n_data):
             np.testing.assert_allclose(
@@ -118,7 +129,9 @@ class Tests(unittest.TestCase):
                 np.cos((j_data + 1) * z - 1) + 3 * np.sin((j_data + 2) * z - j_data)
             )
 
-        features, new_names = compute_mean_k_parallel(raw_feature_tensor, names, include_argmax=True)
+        features, new_names = compute_mean_k_parallel(
+            raw_feature_tensor, names, include_argmax=True
+        )
 
         for j_data in range(n_data):
             np.testing.assert_allclose(
@@ -141,3 +154,24 @@ class Tests(unittest.TestCase):
                 j_data + 2,
                 rtol=1e-13,
             )
+
+    def test_compute_longest_nonzero_interval(self):
+        n_z = 8
+        n_data = n_z + 1
+        n_quantities = 6
+        raw_features = np.zeros((n_data, n_z, n_quantities))
+        raw_features[0, :, 0] = 4 * np.ones(n_z)
+        raw_features[0, :, 2] = [2, 1, -3, 0, 0, 0, 9, 0]
+        raw_features[0, :, 3] = [0, -1, 1, 0, 0, -4, 8, 0]
+        raw_features[0, :, 4] = [0, 8, 0, 0, 3, 0, 1, -1]
+        raw_features[0, :, 5] = [0, -3, 1, 1, -1, 1, -2, 1]
+        for j in range(1, n_data):
+            raw_features[j, :, :] = np.roll(raw_features[0, :, :], j, axis=0)
+        names = ["foo", "bar", "baz", "qux", "zim", "fap"]
+
+        features, new_names = compute_longest_nonzero_interval(raw_features, names)
+        assert features.shape == (n_data, n_quantities - 2)
+        np.testing.assert_allclose(features[:, 0], 3)
+        np.testing.assert_allclose(features[:, 1], 2)
+        np.testing.assert_allclose(features[:, 2], 2)
+        np.testing.assert_allclose(features[:, 3], 7)
