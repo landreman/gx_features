@@ -10,6 +10,7 @@ from gx_features.combinations import (
     make_feature_product_combinations,
     make_feature_quotient_combinations,
     make_feature_product_and_quotient_combinations,
+    heaviside_transformations,
 )
 from gx_features.calculations import differentiate
 
@@ -323,4 +324,62 @@ class Tests(unittest.TestCase):
         )
         np.testing.assert_allclose(
             combinations_tensor[:, :, 4], feature_tensor[:, :, 2] / feature_tensor[:, :, 0]
+        )
+
+    def test_heaviside_transformations(self):
+        feature_tensor, names, Y = load_tensor("test")
+        n_data, n_z, n_quantities = feature_tensor.shape
+        transformed_features, transformed_names = heaviside_transformations(
+            feature_tensor, names
+        )
+        assert transformed_features.shape == (n_data, n_z, 8)
+        assert transformed_names == [
+            "gbdriftPos",
+            "gbdriftNeg",
+            "cvdriftPos",
+            "cvdriftNeg",
+            "gbdrift0_over_shatPos",
+            "gbdrift0_over_shatNeg",
+            "gds21_over_shatPos",
+            "gds21_over_shatNeg",
+        ]
+        np.testing.assert_allclose(
+            transformed_features[:, :, 0],
+            np.where(feature_tensor[:, :, 1] > 0, 1, 0),
+            atol=1e-14,
+        )
+        np.testing.assert_allclose(
+            transformed_features[:, :, 1],
+            np.where(feature_tensor[:, :, 1] < 0, 1, 0),
+            atol=1e-14,
+        )
+        np.testing.assert_allclose(
+            transformed_features[:, :, 2],
+            np.where(feature_tensor[:, :, 2] > 0, 1, 0),
+            atol=1e-14,
+        )
+        np.testing.assert_allclose(
+            transformed_features[:, :, 3],
+            np.where(feature_tensor[:, :, 2] < 0, 1, 0),
+            atol=1e-14,
+        )
+        np.testing.assert_allclose(
+            transformed_features[:, :, 4],
+            np.where(feature_tensor[:, :, 3] > 0, 1, 0),
+            atol=1e-14,
+        )
+        np.testing.assert_allclose(
+            transformed_features[:, :, 5],
+            np.where(feature_tensor[:, :, 3] < 0, 1, 0),
+            atol=1e-14,
+        )
+        np.testing.assert_allclose(
+            transformed_features[:, :, 6],
+            np.where(feature_tensor[:, :, 5] > 0, 1, 0),
+            atol=1e-14,
+        )
+        np.testing.assert_allclose(
+            transformed_features[:, :, 7],
+            np.where(feature_tensor[:, :, 5] < 0, 1, 0),
+            atol=1e-14,
         )
