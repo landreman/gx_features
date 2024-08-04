@@ -1,6 +1,6 @@
 import re
 import numpy as np
-from pandas import DataFrame
+from pandas import DataFrame, read_pickle
 from tsfresh import extract_features
 from feature_engine.selection import DropConstantFeatures
 
@@ -81,3 +81,15 @@ def drop_special_characters_from_column_names(X):
 
     X.rename(renamer, axis="columns", inplace=True)
     return X
+
+
+def row_subset(filename, n):
+    """
+    Given a feature file (in pandas .pkl format), pick the first n rows and save
+    the result as another pandas pkl file.
+    """
+    df = read_pickle(filename)
+    df_subset = df.iloc[:n]
+    new_filename = filename[:-4] + f"_rows{n}.pkl"
+    df_subset.to_pickle(new_filename)
+    print(f"Saved {n} rows to {new_filename}")

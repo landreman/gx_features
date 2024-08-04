@@ -163,10 +163,12 @@ def plot_importances(features_filename, ridge_alpha=20, lasso_alpha=1e-3):
             avg_importances[order[0], j_importance_type],
         )
 
+        n_features_used = min(n_features_to_plot, n_features)
+
         plt.figure(figsize=figsize)
-        ticks = -np.arange(n_features_to_plot)
-        plt.barh(ticks, avg_importances[order[:n_features_to_plot], j_importance_type])
-        plt.yticks(ticks, [feature_names[j] for j in order[:n_features_to_plot]])
+        ticks = -np.arange(n_features_used)
+        plt.barh(ticks, avg_importances[order[:n_features_used], j_importance_type])
+        plt.yticks(ticks, [feature_names[j] for j in order[:n_features_used]])
         plt.title("Most important features")
         plt.xlabel(f"{importance_type} importance")
         plt.tight_layout()

@@ -3,7 +3,7 @@ import numpy as np
 from .calculations import differentiate
 
 
-def remove_cvdrift(feature_tensor):
+def remove_cvdrift(feature_tensor, names):
     """Remove the cvdrift quantity from the feature tensor."""
     # Shape of feature tensor: (n_data, n_z, n_quantities)
     assert feature_tensor.ndim == 3
@@ -13,7 +13,9 @@ def remove_cvdrift(feature_tensor):
     new_feature_tensor[:, :, :2] = feature_tensor[:, :, :2]
     new_feature_tensor[:, :, 2:] = feature_tensor[:, :, 3:]
 
-    return new_feature_tensor
+    new_names = names[:2] + names[3:]
+
+    return new_feature_tensor, new_names
 
 
 def add_local_shear(feature_tensor, names, include_integral=True):
@@ -114,19 +116,71 @@ def make_feature_mask_combinations(feature_tensor, quantity_names, masks, mask_n
 def make_feature_product_combinations(feature_tensor, names):
     n_data, n_z, n_quantities = feature_tensor.shape
     n_combinations = (n_quantities * (n_quantities - 1)) // 2
-    feature_product_combinations = np.zeros((n_data, n_z, n_combinations))
+    tensor_product_combinations = np.zeros((n_data, n_z, n_combinations))
     combination_names = []
     j = 0
     for i in range(n_quantities):
         for k in range(i + 1, n_quantities):
-            feature_product_combinations[:, :, j] = (
+            tensor_product_combinations[:, :, j] = (
                 feature_tensor[:, :, i] * feature_tensor[:, :, k]
             )
-            combination_names.append(names[i] + "_" + names[k])
+            combination_names.append(names[i] + "_x_" + names[k])
             j += 1
     assert j == n_combinations
 
-    return feature_product_combinations, combination_names
+    return tensor_product_combinations, combination_names
+
+
+def make_feature_quotient_combinations(feature_tensor, names):
+    n_data, n_z, n_quantities = feature_tensor.shape
+    n_positive_quantities = 0
+    positive_quantity_indices = []
+    for j in range(n_quantities):
+        if np.all(feature_tensor[:, :, j] > 0):
+            n_positive_quantities += 1
+            positive_quantity_indices.append(j)
+
+    # Number of quotient combinations:
+    # Any of n_positive_quantities can be the denominator.
+    # The numerator can be any of the quantities except the denominator.
+    n_combinations = n_positive_quantities * (n_quantities - 1)
+    tensor_quotient_combinations = np.zeros((n_data, n_z, n_combinations))
+    combination_names = []
+    new_index = 0
+    for j_denominator_positive in range(n_positive_quantities):
+        j_denominator_global = positive_quantity_indices[j_denominator_positive]
+
+        for j_numerator in range(n_quantities):
+            if j_numerator == j_denominator_global:
+                continue
+
+            tensor_quotient_combinations[:, :, new_index] = (
+                feature_tensor[:, :, j_numerator]
+                / feature_tensor[:, :, j_denominator_global]
+            )
+            combination_names.append(
+                names[j_numerator] + "_/_" + names[j_denominator_global]
+            )
+            new_index += 1
+
+    assert new_index == n_combinations
+
+    return tensor_quotient_combinations, combination_names
+
+
+def make_feature_product_and_quotient_combinations(feature_tensor, names):
+    tensor_product_combinations, product_names = make_feature_product_combinations(
+        feature_tensor, names
+    )
+    tensor_quotient_combinations, quotient_names = make_feature_quotient_combinations(
+        feature_tensor, names
+    )
+    return combine_tensors(
+        tensor_product_combinations,
+        product_names,
+        tensor_quotient_combinations,
+        quotient_names,
+    )
 
 
 # def combine_features(tensor1, names1, tensor2, names2):

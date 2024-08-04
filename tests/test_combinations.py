@@ -8,6 +8,8 @@ from gx_features.combinations import (
     create_masks,
     make_feature_mask_combinations,
     make_feature_product_combinations,
+    make_feature_quotient_combinations,
+    make_feature_product_and_quotient_combinations,
 )
 from gx_features.calculations import differentiate
 
@@ -16,7 +18,9 @@ class Tests(unittest.TestCase):
     def test_remove_cvdrift(self):
         data = load_all("test")
         feature_tensor = data["feature_tensor"]
-        new_feature_tensor = remove_cvdrift(feature_tensor)
+        new_feature_tensor, new_names = remove_cvdrift(
+            feature_tensor, data["z_functions"]
+        )
         assert new_feature_tensor.shape == (data["n_data"], data["n_z"], 6)
         np.testing.assert_allclose(
             feature_tensor[:, :, :2], new_feature_tensor[:, :, :2]
@@ -24,6 +28,14 @@ class Tests(unittest.TestCase):
         np.testing.assert_allclose(
             feature_tensor[:, :, 3:], new_feature_tensor[:, :, 2:]
         )
+        assert new_names == [
+            "bmag",
+            "gbdrift",
+            "gbdrift0_over_shat",
+            "gds2",
+            "gds21_over_shat",
+            "gds22_over_shat_squared",
+        ]
 
     def test_add_local_shear(self):
         # First check the case include_integral = True:
@@ -63,7 +75,9 @@ class Tests(unittest.TestCase):
         # Now repeat, after removing cvdrift:
 
         data = load_all("test")
-        feature_tensor = remove_cvdrift(data["feature_tensor"])
+        feature_tensor, names = remove_cvdrift(
+            data["feature_tensor"], data["z_functions"]
+        )
         new_feature_tensor, _ = add_local_shear(
             feature_tensor, data["z_functions"], include_integral=True
         )
@@ -84,7 +98,7 @@ class Tests(unittest.TestCase):
         # Now check the case include_integral = False:
 
         feature_tensor, names, Y = load_tensor("test")
-        feature_tensor = remove_cvdrift(feature_tensor)
+        feature_tensor, names = remove_cvdrift(feature_tensor, names)
         new_feature_tensor, _ = add_local_shear(
             feature_tensor, names, include_integral=False
         )
@@ -120,7 +134,9 @@ class Tests(unittest.TestCase):
 
         # Now repeat after removing cvdrift:
 
-        feature_tensor = remove_cvdrift(data["feature_tensor"])
+        feature_tensor, names = remove_cvdrift(
+            data["feature_tensor"], data["z_functions"]
+        )
         masks, mask_names = create_masks(feature_tensor)
         assert masks.shape[2] == 3
         np.testing.assert_allclose(masks[:, :, 0], 1)
@@ -195,7 +211,11 @@ class Tests(unittest.TestCase):
         product_features, product_names = make_feature_product_combinations(
             feature_tensor, names
         )
-        assert product_names == ["bmag_gbdrift", "bmag_cvdrift", "gbdrift_cvdrift"]
+        assert product_names == [
+            "bmag_x_gbdrift",
+            "bmag_x_cvdrift",
+            "gbdrift_x_cvdrift",
+        ]
         n_data, n_z, _ = feature_tensor.shape
         assert product_features.shape == (n_data, n_z, 3)
         np.testing.assert_allclose(
@@ -206,4 +226,101 @@ class Tests(unittest.TestCase):
         )
         np.testing.assert_allclose(
             product_features[:, :, 2], feature_tensor[:, :, 1] * feature_tensor[:, :, 2]
+        )
+
+    def test_make_feature_quotient_combinations(self):
+        # First try the first 3 features:
+
+        feature_tensor, names, Y = load_tensor("test")
+        n_quantities = 3
+        feature_tensor = feature_tensor[:, :, :n_quantities]
+        names = names[:n_quantities]
+        quotient_tensor, quotient_names = make_feature_quotient_combinations(
+            feature_tensor, names
+        )
+        assert quotient_names == ["gbdrift_/_bmag", "cvdrift_/_bmag"]
+        n_data, n_z, _ = feature_tensor.shape
+        assert quotient_tensor.shape == (n_data, n_z, 2)
+        assert len(quotient_names) == 2
+        np.testing.assert_allclose(
+            quotient_tensor[:, :, 0], feature_tensor[:, :, 1] / feature_tensor[:, :, 0]
+        )
+        np.testing.assert_allclose(
+            quotient_tensor[:, :, 1], feature_tensor[:, :, 2] / feature_tensor[:, :, 0]
+        )
+
+        # Now try the first 4 features, after removing cvdrift:
+
+        feature_tensor, names, Y = load_tensor("test")
+        feature_tensor, names = remove_cvdrift(feature_tensor, names)
+        n_quantities = 4
+        feature_tensor = feature_tensor[:, :, :n_quantities]
+        names = names[:n_quantities]
+        quotient_tensor, quotient_names = make_feature_quotient_combinations(
+            feature_tensor, names
+        )
+        assert quotient_names == [
+            "gbdrift_/_bmag",
+            "gbdrift0_over_shat_/_bmag",
+            "gds2_/_bmag",
+            "bmag_/_gds2",
+            "gbdrift_/_gds2",
+            "gbdrift0_over_shat_/_gds2",
+        ]
+        n_data, n_z, _ = feature_tensor.shape
+        assert quotient_tensor.shape == (n_data, n_z, 6)
+        assert len(quotient_names) == 6
+        np.testing.assert_allclose(
+            quotient_tensor[:, :, 0], feature_tensor[:, :, 1] / feature_tensor[:, :, 0]
+        )
+        np.testing.assert_allclose(
+            quotient_tensor[:, :, 1], feature_tensor[:, :, 2] / feature_tensor[:, :, 0]
+        )
+        np.testing.assert_allclose(
+            quotient_tensor[:, :, 2], feature_tensor[:, :, 3] / feature_tensor[:, :, 0]
+        )
+        np.testing.assert_allclose(
+            quotient_tensor[:, :, 3], feature_tensor[:, :, 0] / feature_tensor[:, :, 3]
+        )
+        np.testing.assert_allclose(
+            quotient_tensor[:, :, 4], feature_tensor[:, :, 1] / feature_tensor[:, :, 3]
+        )
+        np.testing.assert_allclose(
+            quotient_tensor[:, :, 5], feature_tensor[:, :, 2] / feature_tensor[:, :, 3]
+        )
+
+    def test_make_feature_product_and_quotient_combinations(self):
+        # First try the first 3 features:
+
+        feature_tensor, names, Y = load_tensor("test")
+        n_quantities = 3
+        feature_tensor = feature_tensor[:, :, :n_quantities]
+        names = names[:n_quantities]
+        quotient_tensor, quotient_names = make_feature_product_and_quotient_combinations(
+            feature_tensor, names
+        )
+        assert quotient_names == [
+            "bmag_x_gbdrift",
+            "bmag_x_cvdrift",
+            "gbdrift_x_cvdrift",
+            "gbdrift_/_bmag",
+            "cvdrift_/_bmag",
+        ]
+        n_data, n_z, _ = feature_tensor.shape
+        assert quotient_tensor.shape == (n_data, n_z, 5)
+        assert len(quotient_names) == 5
+        np.testing.assert_allclose(
+            quotient_tensor[:, :, 0], feature_tensor[:, :, 1] * feature_tensor[:, :, 0]
+        )
+        np.testing.assert_allclose(
+            quotient_tensor[:, :, 1], feature_tensor[:, :, 2] * feature_tensor[:, :, 0]
+        )
+        np.testing.assert_allclose(
+            quotient_tensor[:, :, 2], feature_tensor[:, :, 2] * feature_tensor[:, :, 1]
+        )
+        np.testing.assert_allclose(
+            quotient_tensor[:, :, 3], feature_tensor[:, :, 1] / feature_tensor[:, :, 0]
+        )
+        np.testing.assert_allclose(
+            quotient_tensor[:, :, 4], feature_tensor[:, :, 2] / feature_tensor[:, :, 0]
         )
