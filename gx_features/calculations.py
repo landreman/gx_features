@@ -14,10 +14,15 @@ def differentiate(data):
     return (np.roll(data, -1, axis=1) - np.roll(data, 1, axis=1)) / (2 * dz)
 
 
-def compute_mean_k_parallel(data, names):
+def compute_mean_k_parallel(data, names, include_argmax=False):
     """Compute the mean k_parallel for each data point.
 
     data should have shape (n_data, n_z, n_quantities).
+
+    If include_argmax=False, the function returns an array of shape (n_data,
+    n_quantities).
+    
+    If include_argmax=True, the function returns an array of shape (n_data, n_quantities*2).
     """
     n_data, n_z, n_quantities = data.shape
 
@@ -32,16 +37,24 @@ def compute_mean_k_parallel(data, names):
     # k_parallel = k_parallel[1:max_index]
     k_parallel = np.arange(1, max_index)
 
-    data_hat_abs2 = np.abs(data_hat) ** 2
+    data_hat_abs = np.abs(data_hat)
     mean_k_parallel = np.sum(
-        k_parallel[None, :, None] * data_hat_abs2, axis=1
-    ) / np.sum(data_hat_abs2, axis=1)
+        k_parallel[None, :, None] * data_hat_abs, axis=1
+    ) / np.sum(data_hat_abs, axis=1)
 
     # To avoid NaNs:
     assert (
-        np.min(np.sum(data_hat_abs2, axis=1)) > 0
+        np.min(np.sum(data_hat_abs, axis=1)) > 0
     ), "Some row of data was constant so mean k|| is not defined."
 
-    kpar_names = [n + "__mean_kpar" for n in names]
+    mean_kpar_names = [n + "__mean_kpar" for n in names]
 
-    return mean_k_parallel, kpar_names
+    if not include_argmax:
+        return mean_k_parallel, mean_kpar_names
+    
+    argmax_k_parallel = np.argmax(data_hat_abs, axis=1) + 1
+    argmax_kpar_names = [n + "__argmax_kpar" for n in names]
+
+    new_features = np.concatenate((mean_k_parallel, argmax_k_parallel), axis=1)
+    new_names = mean_kpar_names + argmax_kpar_names
+    return new_features, new_names

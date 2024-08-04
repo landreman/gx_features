@@ -296,10 +296,10 @@ class Tests(unittest.TestCase):
         n_quantities = 3
         feature_tensor = feature_tensor[:, :, :n_quantities]
         names = names[:n_quantities]
-        quotient_tensor, quotient_names = make_feature_product_and_quotient_combinations(
+        combinations_tensor, combinations_names = make_feature_product_and_quotient_combinations(
             feature_tensor, names
         )
-        assert quotient_names == [
+        assert combinations_names == [
             "bmag_x_gbdrift",
             "bmag_x_cvdrift",
             "gbdrift_x_cvdrift",
@@ -307,20 +307,20 @@ class Tests(unittest.TestCase):
             "cvdrift_/_bmag",
         ]
         n_data, n_z, _ = feature_tensor.shape
-        assert quotient_tensor.shape == (n_data, n_z, 5)
-        assert len(quotient_names) == 5
+        assert combinations_tensor.shape == (n_data, n_z, 5)
+        assert len(combinations_names) == 5
         np.testing.assert_allclose(
-            quotient_tensor[:, :, 0], feature_tensor[:, :, 1] * feature_tensor[:, :, 0]
+            combinations_tensor[:, :, 0], feature_tensor[:, :, 1] * feature_tensor[:, :, 0]
         )
         np.testing.assert_allclose(
-            quotient_tensor[:, :, 1], feature_tensor[:, :, 2] * feature_tensor[:, :, 0]
+            combinations_tensor[:, :, 1], feature_tensor[:, :, 2] * feature_tensor[:, :, 0]
         )
         np.testing.assert_allclose(
-            quotient_tensor[:, :, 2], feature_tensor[:, :, 2] * feature_tensor[:, :, 1]
+            combinations_tensor[:, :, 2], feature_tensor[:, :, 2] * feature_tensor[:, :, 1]
         )
         np.testing.assert_allclose(
-            quotient_tensor[:, :, 3], feature_tensor[:, :, 1] / feature_tensor[:, :, 0]
+            combinations_tensor[:, :, 3], feature_tensor[:, :, 1] / feature_tensor[:, :, 0]
         )
         np.testing.assert_allclose(
-            quotient_tensor[:, :, 4], feature_tensor[:, :, 2] / feature_tensor[:, :, 0]
+            combinations_tensor[:, :, 4], feature_tensor[:, :, 2] / feature_tensor[:, :, 0]
         )
