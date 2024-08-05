@@ -42,10 +42,21 @@ def compute_mean_k_parallel(data, names, include_argmax=False):
         data_hat_abs, axis=1
     )
 
+    # Handle the case in which data_hat_abs is all zero, so we just divided by 0.
+    for j in range(n_quantities):
+        sum_abs_data_hat = np.sum(data_hat_abs[:, :, j], axis=1) < 1e-13
+        n_zeros = np.sum(sum_abs_data_hat)
+        if n_zeros > 0:
+            print("Warning!!! data_hat_abs = 0 for", n_zeros, "rows of", names[j])
+        zero_locations = np.nonzero(np.sum(data_hat_abs[:, :, j], axis=1) < 1e-13)[0]
+        if n_zeros > 0 and n_zeros < 100:
+            print(zero_locations)
+        mean_k_parallel[zero_locations, j] = 0
+
     # To avoid NaNs:
-    assert (
-        np.min(np.sum(data_hat_abs, axis=1)) > 0
-    ), "Some row of data was constant so mean k|| is not defined."
+    # assert (
+    #     np.min(np.sum(data_hat_abs, axis=1)) > 0
+    # ), "Some row of data was constant so mean k|| is not defined."
 
     mean_kpar_names = [n + "__mean_kpar" for n in names]
 

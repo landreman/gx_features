@@ -155,6 +155,19 @@ class Tests(unittest.TestCase):
                 rtol=1e-13,
             )
 
+    def test_mean_k_parallel_with_0s(self):
+        raw_features = np.random.rand(10, 12, 3)
+        # Set a few rows to constants
+        raw_features[2, :, 1] = 0
+        raw_features[8, :, 1] = 0
+        raw_features[5, :, 2] = 1
+        raw_features[0, :, 0] = -2
+        names = ["foo", "bar", "yaz"]
+        for include_argmax in [False, True]:
+            features, new_names = compute_mean_k_parallel(
+                raw_features, names, include_argmax=include_argmax,
+            )
+
     def test_compute_longest_nonzero_interval(self):
         n_z = 8
         n_data = n_z + 1

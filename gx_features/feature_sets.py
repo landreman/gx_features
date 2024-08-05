@@ -489,14 +489,17 @@ def create_features_20240730_01():
     features.to_pickle(filename + ".pkl")
 
 
-def create_features_20240804_01():
+def create_features_20240804_01(n_data=None):
+    """
+    If n_data is None, all data entries will be used.
+    If n_data is an integer, the data will be trimmed to the first n_data entries.
+    """
     raw_tensor, raw_names, Y = load_tensor("20240726")
     raw_names = simplify_names(raw_names)
 
-    # For now, crop the data
-    n_data = 50
-    raw_tensor = raw_tensor[:n_data, :, :]
-    Y = Y[:n_data]
+    if n_data is not None:
+        raw_tensor = raw_tensor[:n_data, :, :]
+        Y = Y[:n_data]
 
     # Add local shear as a feature:
     F, F_names = add_local_shear(raw_tensor, raw_names, include_integral=False)
