@@ -18,11 +18,15 @@ from .combinations import (
     make_feature_mask_combinations,
     make_feature_product_combinations,
     combine_tensors,
+    make_feature_product_and_quotient_combinations,
+    heaviside_transformations,
+    divide_by_quantity,
 )
 from .utils import (
     tensor_to_tsfresh_dataframe,
     drop_nearly_constant_features,
     drop_special_characters_from_column_names,
+    simplify_names,
 )
 
 
@@ -482,6 +486,47 @@ def create_features_20240730_01():
     filename = "20240726-01-kpar_and_pair_mask_features_20240730_01"
 
     features.to_pickle(filename + ".pkl")
+
+
+def create_features_20240804_01():
+    raw_tensor, raw_names, Y = load_tensor("20240726")
+    raw_names = simplify_names(raw_names)
+
+    # For now, crop the data
+    n_data = 100
+    raw_tensor = raw_tensor[:n_data, :, :]
+    Y = Y[:n_data]
+
+    # Add local shear as a feature:
+    F, F_names = add_local_shear(raw_tensor, raw_names, include_integral=False)
+
+    CF, CF_names = make_feature_product_and_quotient_combinations(F, F_names)
+
+    M, M_names = heaviside_transformations(F, F_names)
+    print("M_names:", M_names)
+
+    MF, MF_names = make_feature_mask_combinations(F, F_names, M, M_names)
+    MCF, MCF_names = make_feature_mask_combinations(CF, CF_names, M, M_names)
+
+    tensor_before_inv_bmag, names_before_inv_bmag = combine_tensors(
+        F, F_names, MF, MF_names, CF, CF_names, MCF, MCF_names
+    )
+
+    tensor_after_inv_bmag, names_after_inv_bmag = divide_by_quantity(
+        tensor_before_inv_bmag, names_before_inv_bmag, raw_tensor[:, :, 0], "bmag"
+    )
+
+    tensor, names = combine_tensors(
+        tensor_before_inv_bmag,
+        names_before_inv_bmag,
+        tensor_after_inv_bmag,
+        names_after_inv_bmag,
+    )
+
+    print("\nFeatures:\n")
+    for n in names:
+        print(n)
+    print("\nNumber of features:", len(names))
 
 
 def create_test_features():

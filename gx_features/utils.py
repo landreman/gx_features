@@ -93,3 +93,16 @@ def row_subset(filename, n):
     new_filename = filename[:-4] + f"_rows{n}.pkl"
     df_subset.to_pickle(new_filename)
     print(f"Saved {n} rows to {new_filename}")
+
+
+def simplify_names(names):
+    """
+    Given a list of names, return a simplified version of the names.
+    """
+    simplified_names = []
+    for name in names:
+        simplified_name = name.replace("_over_shat_squared", "").replace(
+            "_over_shat", ""
+        )
+        simplified_names.append(simplified_name)
+    return simplified_names

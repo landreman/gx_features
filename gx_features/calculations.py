@@ -115,6 +115,7 @@ def compute_longest_nonzero_interval(data, names):
 
     return features, new_names
 
+
 def compute_max_minus_min(data, names):
     n_data, n_z, n_quantities = data.shape
 

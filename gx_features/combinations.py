@@ -168,6 +168,19 @@ def make_feature_quotient_combinations(feature_tensor, names):
     return tensor_quotient_combinations, combination_names
 
 
+def make_inverse_quantities(feature_tensor, names):
+    n_data, n_z, n_quantities = feature_tensor.shape
+    positive_quantity_indices = []
+    new_names = []
+    for j in range(n_quantities):
+        if np.all(feature_tensor[:, :, j] > 0):
+            positive_quantity_indices.append(j)
+            new_names.append("1/" + names[j])
+
+    new_tensor = 1 / feature_tensor[:, :, positive_quantity_indices]
+    return new_tensor, new_names
+
+
 def make_feature_product_and_quotient_combinations(feature_tensor, names):
     tensor_product_combinations, product_names = make_feature_product_combinations(
         feature_tensor, names
@@ -181,6 +194,25 @@ def make_feature_product_and_quotient_combinations(feature_tensor, names):
         tensor_quotient_combinations,
         quotient_names,
     )
+
+
+def divide_by_quantity(feature_tensor, names, quotient, quotient_name):
+    """
+    Divide each quantity in the feature tensor by the given quantity.
+
+    feature_tensor: (n_data, n_z, n_quantities)
+    quotient: (n_data, n_z)
+    """
+
+    indices_to_include = []
+    new_names = []
+    for j, name in enumerate(names):
+        if not name.startswith(quotient_name):
+            indices_to_include.append(j)
+            new_names.append(names[j] + "_/_" + quotient_name)
+
+    new_features = feature_tensor[:, :, indices_to_include] / quotient[:, :, None]
+    return new_features, new_names
 
 
 # def combine_features(tensor1, names1, tensor2, names2):
@@ -233,8 +265,11 @@ def heaviside_transformations(tensor, names):
 
     new_tensor = np.zeros((n_data, n_z, 2 * n_quantities_with_both_signs))
     for j in range(n_quantities_with_both_signs):
-        new_tensor[:, :, 2 * j] = np.heaviside(tensor[:, :, quantities_with_both_signs[j]], 0)
-        new_tensor[:, :, 2 * j + 1] = np.heaviside(-tensor[:, :, quantities_with_both_signs[j]], 0)
+        new_tensor[:, :, 2 * j] = np.heaviside(
+            tensor[:, :, quantities_with_both_signs[j]], 0
+        )
+        new_tensor[:, :, 2 * j + 1] = np.heaviside(
+            -tensor[:, :, quantities_with_both_signs[j]], 0
+        )
 
     return new_tensor, new_names
-

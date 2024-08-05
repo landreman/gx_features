@@ -9,6 +9,7 @@ from gx_features.combinations import (
     make_feature_mask_combinations,
     make_feature_product_combinations,
     make_feature_quotient_combinations,
+    make_inverse_quantities,
     make_feature_product_and_quotient_combinations,
     heaviside_transformations,
 )
@@ -290,6 +291,30 @@ class Tests(unittest.TestCase):
             quotient_tensor[:, :, 5], feature_tensor[:, :, 2] / feature_tensor[:, :, 3]
         )
 
+    def test_make_inverse_quantities(self):
+        # First try the first 3 features:
+
+        feature_tensor, names, Y = load_tensor("test")
+        n_quantities = 3
+        feature_tensor = feature_tensor[:, :, :n_quantities]
+        names = names[:n_quantities]
+        inverse_tensor, inverse_names = make_inverse_quantities(feature_tensor, names)
+        assert inverse_names == ["1/bmag"]
+        n_data, n_z, _ = feature_tensor.shape
+        assert inverse_tensor.shape == (n_data, n_z, 1)
+        np.testing.assert_allclose(inverse_tensor[:, :, 0], 1 / feature_tensor[:, :, 0])
+
+        # Now try all raw quantities:
+
+        feature_tensor, names, Y = load_tensor("test")
+        inverse_tensor, inverse_names = make_inverse_quantities(feature_tensor, names)
+        assert inverse_names == ["1/bmag", "1/gds2", "1/gds22_over_shat_squared"]
+        n_data, n_z, _ = feature_tensor.shape
+        assert inverse_tensor.shape == (n_data, n_z, 3)
+        np.testing.assert_allclose(inverse_tensor[:, :, 0], 1 / feature_tensor[:, :, 0])
+        np.testing.assert_allclose(inverse_tensor[:, :, 1], 1 / feature_tensor[:, :, 4])
+        np.testing.assert_allclose(inverse_tensor[:, :, 2], 1 / feature_tensor[:, :, 6])
+
     def test_make_feature_product_and_quotient_combinations(self):
         # First try the first 3 features:
 
@@ -297,8 +322,8 @@ class Tests(unittest.TestCase):
         n_quantities = 3
         feature_tensor = feature_tensor[:, :, :n_quantities]
         names = names[:n_quantities]
-        combinations_tensor, combinations_names = make_feature_product_and_quotient_combinations(
-            feature_tensor, names
+        combinations_tensor, combinations_names = (
+            make_feature_product_and_quotient_combinations(feature_tensor, names)
         )
         assert combinations_names == [
             "bmag_x_gbdrift",
@@ -311,19 +336,24 @@ class Tests(unittest.TestCase):
         assert combinations_tensor.shape == (n_data, n_z, 5)
         assert len(combinations_names) == 5
         np.testing.assert_allclose(
-            combinations_tensor[:, :, 0], feature_tensor[:, :, 1] * feature_tensor[:, :, 0]
+            combinations_tensor[:, :, 0],
+            feature_tensor[:, :, 1] * feature_tensor[:, :, 0],
         )
         np.testing.assert_allclose(
-            combinations_tensor[:, :, 1], feature_tensor[:, :, 2] * feature_tensor[:, :, 0]
+            combinations_tensor[:, :, 1],
+            feature_tensor[:, :, 2] * feature_tensor[:, :, 0],
         )
         np.testing.assert_allclose(
-            combinations_tensor[:, :, 2], feature_tensor[:, :, 2] * feature_tensor[:, :, 1]
+            combinations_tensor[:, :, 2],
+            feature_tensor[:, :, 2] * feature_tensor[:, :, 1],
         )
         np.testing.assert_allclose(
-            combinations_tensor[:, :, 3], feature_tensor[:, :, 1] / feature_tensor[:, :, 0]
+            combinations_tensor[:, :, 3],
+            feature_tensor[:, :, 1] / feature_tensor[:, :, 0],
         )
         np.testing.assert_allclose(
-            combinations_tensor[:, :, 4], feature_tensor[:, :, 2] / feature_tensor[:, :, 0]
+            combinations_tensor[:, :, 4],
+            feature_tensor[:, :, 2] / feature_tensor[:, :, 0],
         )
 
     def test_heaviside_transformations(self):
