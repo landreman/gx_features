@@ -1,5 +1,6 @@
 import os
 import pickle
+import psutil
 import numpy as np
 from pandas import DataFrame, read_pickle
 import matplotlib.pyplot as plt
@@ -30,6 +31,7 @@ from .utils import (
     simplify_names,
 )
 
+n_logical_threads = psutil.cpu_count(logical=True)
 
 def create_tensors_20240725_01(dataset):
     raw_tensor, raw_names, Y = load_tensor(dataset)
@@ -590,11 +592,13 @@ def create_features_20240804_01(n_data=None):
     }
 
     df_for_tsfresh = tensor_to_tsfresh_dataframe(tensor, names)
+    print("n_jobs for tsfresh:", n_logical_threads)
     extracted_features_from_tsfresh = extract_features(
         df_for_tsfresh,
         column_id="j_tube",
         column_sort="z",
         default_fc_parameters=tsfresh_feature_options,
+        n_jobs=n_logical_threads,
     )
     print(
         "Number of tsfresh features:",
