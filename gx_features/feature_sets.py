@@ -10,7 +10,7 @@ from tsfresh import extract_features
 import lightgbm as lgb
 
 from .io import load_tensor
-from .calculations import compute_mean_k_parallel
+from .calculations import compute_mean_k_parallel, compute_max_minus_min
 from .combinations import (
     add_local_shear,
     create_masks,
@@ -19,6 +19,7 @@ from .combinations import (
     make_feature_product_combinations,
     combine_tensors,
     make_feature_product_and_quotient_combinations,
+    make_inverse_quantities,
     heaviside_transformations,
     divide_by_quantity,
 )
@@ -493,14 +494,19 @@ def create_features_20240804_01():
     raw_names = simplify_names(raw_names)
 
     # For now, crop the data
-    n_data = 100
+    n_data = 50
     raw_tensor = raw_tensor[:n_data, :, :]
     Y = Y[:n_data]
 
     # Add local shear as a feature:
     F, F_names = add_local_shear(raw_tensor, raw_names, include_integral=False)
 
-    CF, CF_names = make_feature_product_and_quotient_combinations(F, F_names)
+    # Add inverse quantities:
+    inverse_tensor, inverse_names = make_inverse_quantities(F, F_names)
+    F, F_names = combine_tensors(F, F_names, inverse_tensor, inverse_names)
+
+    # CF, CF_names = make_feature_product_and_quotient_combinations(F, F_names)
+    CF, CF_names = make_feature_product_combinations(F, F_names)
 
     M, M_names = heaviside_transformations(F, F_names)
     print("M_names:", M_names)
@@ -523,10 +529,94 @@ def create_features_20240804_01():
         names_after_inv_bmag,
     )
 
-    print("\nFeatures:\n")
+    print("\nQuantities before reduction:\n")
     for n in names:
         print(n)
-    print("\nNumber of features:", len(names))
+    print("\nNumber of quantities before reduction:", len(names))
+
+    ###########################################################################
+    # Now apply reductions.
+    ###########################################################################
+
+    # First compute any custom features:
+
+    custom_features1, custom_features_names1 = compute_mean_k_parallel(
+        tensor, names, include_argmax=True
+    )
+    custom_features2, custom_features_names2 = compute_max_minus_min(
+        tensor, names,
+    )
+    custom_features = np.concatenate((custom_features1, custom_features2), axis=1)
+    custom_features_names = custom_features_names1 + custom_features_names2
+    custom_features_df = DataFrame(custom_features, columns=custom_features_names)
+    print("Number of custom features:", len(custom_features_names))
+
+    # Now compute the tsfresh features:
+
+    count_above_thresholds = np.arange(-2, 6.1, 0.5)
+    count_above_params = [{"t": t} for t in count_above_thresholds]
+    print("count_above_params:", count_above_params)
+
+    fft_coefficients = []
+    # Don't include the zeroth coefficient since this is just the mean,
+    # which we will include separately.
+    for j in range(1, 4):
+        fft_coefficients.append({"attr": "abs", "coeff": j})
+    print("fft_coefficients:", fft_coefficients)
+
+    tsfresh_feature_options = {
+        "count_above": count_above_params,
+        "fft_coefficient": fft_coefficients,
+        "maximum": None,
+        "mean": None,
+        "median": None,
+        "minimum": None,
+        "quantile": [
+            {"q": 0.1},
+            {"q": 0.2},
+            {"q": 0.3},
+            {"q": 0.4},
+            {"q": 0.6},
+            {"q": 0.7},
+            {"q": 0.8},
+            {"q": 0.9},
+        ],
+        "root_mean_square": None,
+        "skewness": None,
+        "variance": None,
+    }
+
+    df_for_tsfresh = tensor_to_tsfresh_dataframe(tensor, names)
+    extracted_features_from_tsfresh = extract_features(
+        df_for_tsfresh,
+        column_id="j_tube",
+        column_sort="z",
+        default_fc_parameters=tsfresh_feature_options,
+    )
+    print(
+        "Number of tsfresh features:",
+        len(extracted_features_from_tsfresh.columns),
+    )
+
+    extracted_features = extracted_features_from_tsfresh.join(custom_features_df)
+
+    print(
+        "Number of features before dropping nearly constant features:",
+        extracted_features.shape[1],
+    )
+    features = drop_nearly_constant_features(extracted_features)
+
+    print("\n****** Final features ******\n")
+    for f in features.columns:
+        print(f)
+    print("Final number of features:", features.shape[1])
+
+    features["Y"] = Y
+    drop_special_characters_from_column_names(features)
+
+    filename = "20240726-01-kpar_and_pair_mask_features_20240804_01"
+
+    features.to_pickle(filename + ".pkl")
 
 
 def create_test_features():
