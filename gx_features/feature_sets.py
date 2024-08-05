@@ -638,6 +638,19 @@ def create_features_20240804_01(n_data=None):
         "Number of features before dropping nearly constant features:",
         extracted_features.shape[1],
     )
+    # Check for any NaNs
+    nan_locations = np.nonzero(np.isnan(extracted_features.to_numpy()))
+    if len(nan_locations[0]) > 0:
+        for j in range(len(nan_locations[0])):
+            print(
+                "NaN found at row",
+                nan_locations[0][j],
+                "and column",
+                nan_locations[1][j],
+            )
+    else:
+        print("No NaNs found")
+
     features = drop_nearly_constant_features(extracted_features)
 
     print("\n****** Final features ******\n")

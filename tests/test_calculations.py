@@ -6,6 +6,7 @@ from gx_features.calculations import (
     differentiate,
     compute_mean_k_parallel,
     compute_longest_nonzero_interval,
+    compute_mask_for_longest_true_interval,
     compute_reductions,
 )
 from gx_features.io import load_tensor
@@ -189,6 +190,32 @@ class Tests(unittest.TestCase):
         names = ["foo", "bar", "baz", "qux", "zim", "fap"]
 
         features, new_names = compute_longest_nonzero_interval(raw_features, names)
+        assert features.shape == (n_data, n_quantities - 2)
+        np.testing.assert_allclose(features[:, 0], 3)
+        np.testing.assert_allclose(features[:, 1], 2)
+        np.testing.assert_allclose(features[:, 2], 2)
+        np.testing.assert_allclose(features[:, 3], 7)
+
+    @unittest.skip
+    def test_compute_mask_for_longest_true_interval(self):
+        n_z = 8
+        n_data = n_z + 1
+        n_quantities = 6
+        raw_features = np.zeros((n_data, n_z, n_quantities))
+        features_should_be = np.zeros((n_data, n_z, n_quantities))
+        raw_features[0, :, 0] = np.full(n_z, True)
+        raw_features[0, :, 2] = [1, 1, 1, 0, 0, 0, 1, 0]
+        raw_features[0, :, 3] = [0, 1, 1, 0, 0, 1, 1, 0]
+        raw_features[0, :, 4] = [0, 1, 0, 0, 1, 0, 1, 1]
+        raw_features[0, :, 5] = [0, 1, 1, 1, 1, 1, 1, 1]
+
+        # features_should_be[0, :, 0] = 
+
+        for j in range(1, n_data):
+            raw_features[j, :, :] = np.roll(raw_features[0, :, :], j, axis=0)
+        names = ["foo", "bar", "baz", "qux", "zim", "fap"]
+
+        features = compute_mask_for_longest_true_interval(raw_features)
         assert features.shape == (n_data, n_quantities - 2)
         np.testing.assert_allclose(features[:, 0], 3)
         np.testing.assert_allclose(features[:, 1], 2)

@@ -129,6 +129,48 @@ def compute_longest_nonzero_interval(data, names):
     return features, new_names
 
 
+def compute_mask_for_longest_true_interval(data):
+    """Compute the longest interval of True values for each quantity.
+
+    It only makes sense to apply this function after masks have been applied.
+
+    data should have shape (n_data, n_z, n_quantities) and have dtype=bool.
+    """
+    n_data, n_z, n_quantities = data.shape
+
+    zero_padding = np.zeros((n_data, 1, n_quantities))
+    nonzeros3 = np.concatenate(
+        (zero_padding, data, data, data, zero_padding), axis=1
+    )
+    diff = nonzeros3[:, 1:, :] - nonzeros3[:, :-1, :]
+
+    features = np.zeros((n_data, n_quantities))
+    for j_data in range(n_data):
+        for j_quantity in range(n_quantities):
+            starts = np.nonzero(diff[j_data, :, j_quantity] > 0.5)[0]
+            ends = np.nonzero(diff[j_data, :, j_quantity] < -0.5)[0]
+            interval_lengths = ends - starts
+            # print(f"j_data: {j_data}, j_quantity: {j_quantity}")
+            # print("nonzeros:")
+            # print(nonzeros[j_data, :, j_quantity])
+            # print("nonzeros3:")
+            # print(nonzeros3[j_data, :, j_quantity])
+            # print("diff:")
+            # print(diff[j_data, :, j_quantity])
+            # print("starts:", starts)
+            # print("ends:  ", ends)
+            assert len(starts) == len(ends)
+            # If the array happens to be all 0's for a certain data entry,
+            # starts and ends will be [], so max will fail.
+            if len(starts) > 0:
+                j_longest_interval = np.argmax(interval_lengths)
+                start = max(starts[j_longest_interval] - n_z - 1, 0)
+                end = min(ends[j_longest_interval] - n_z - 1, n_z)
+                features[j_data, j_quantity, start:end] = 1
+
+    return features
+
+
 def compute_max_minus_min(data, names):
     n_data, n_z, n_quantities = data.shape
 
