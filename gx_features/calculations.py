@@ -1,4 +1,6 @@
 import numpy as np
+from scipy.stats import skew
+import pandas as pd
 
 
 def differentiate(data):
@@ -134,3 +136,146 @@ def compute_max_minus_min(data, names):
     new_names = [n + "__maxMinusMin" for n in names]
 
     return features, new_names
+
+
+def compute_reductions(
+    tensor,
+    names,
+    max=False,
+    min=False,
+    max_minus_min=False,
+    mean=False,
+    median=False,
+    variance=False,
+    rms=False,
+    skewness=False,
+    quantiles=None,
+    count_above=None,
+    fft_coefficients=None,
+    mean_kpar=False,
+    argmax_kpar=False,
+):
+    print("Beginning compute_reductions")
+    n_data, n_z, n_quantities = tensor.shape
+
+    n_features = 0
+    if max:
+        n_features += 1
+    if min:
+        n_features += 1
+    if max_minus_min:
+        n_features += 1
+    if mean:
+        n_features += 1
+    if median:
+        n_features += 1
+    if variance:
+        n_features += 1
+    if rms:
+        n_features += 1
+    if skewness:
+        n_features += 1
+    if quantiles is not None:
+        n_features += len(quantiles)
+    if count_above is not None:
+        n_features += len(count_above)
+    if fft_coefficients is not None:
+        n_features += len(fft_coefficients)
+    if mean_kpar:
+        n_features += 1
+    if argmax_kpar:
+        n_features += 1
+
+    n_features_total = n_features * n_quantities
+    features = np.zeros((n_data, n_features_total))
+    index = 0
+    new_names = []
+
+    if max:
+        features[:, index : index + n_quantities] = np.max(tensor, axis=1)
+        new_names += [n + "_max" for n in names]
+        index += n_quantities
+
+    if min:
+        features[:, index : index + n_quantities] = np.min(tensor, axis=1)
+        new_names += [n + "_min" for n in names]
+        index += n_quantities
+
+    if max_minus_min:
+        features[:, index : index + n_quantities] = np.max(tensor, axis=1) - np.min(
+            tensor, axis=1
+        )
+        new_names += [n + "_maxMinusMin" for n in names]
+        index += n_quantities
+
+    if mean:
+        features[:, index : index + n_quantities] = np.mean(tensor, axis=1)
+        new_names += [n + "_mean" for n in names]
+        index += n_quantities
+
+    if median:
+        features[:, index : index + n_quantities] = np.median(tensor, axis=1)
+        new_names += [n + "_median" for n in names]
+        index += n_quantities
+        print("Done with median calculation")
+
+    if rms:
+        features[:, index : index + n_quantities] = np.sqrt(np.mean(tensor**2, axis=1))
+        new_names += [n + "_rms" for n in names]
+        index += n_quantities
+        print("Done with RMS calculation")
+
+    if variance:
+        features[:, index : index + n_quantities] = np.var(tensor, axis=1)
+        new_names += [n + "_variance" for n in names]
+        index += n_quantities
+        print("Done with variance calculation")
+
+    if skewness:
+        features[:, index : index + n_quantities] = skew(tensor, axis=1, bias=False)
+        new_names += [n + "_skewness" for n in names]
+        index += n_quantities
+        print("Done with skewness calculation")
+
+    if quantiles is not None:
+        quantiles_result = np.quantile(tensor, quantiles, axis=1)
+        for j_quantile, q in enumerate(quantiles):
+            features[:, index : index + n_quantities] = quantiles_result[j_quantile, :]
+            new_names += [n + f"_quantile{q}" for n in names]
+            index += n_quantities
+        print("Done with quantiles calculation")
+
+    if count_above is not None:
+        for t in count_above:
+            features[:, index : index + n_quantities] = np.mean(tensor > t, axis=1)
+            new_names += [n + f"_countAbove{t}" for n in names]
+            index += n_quantities
+        print("Done with count_above calculation")
+
+    if fft_coefficients is not None:
+        fft_result = np.fft.fft(tensor, axis=1)
+        abs_fft_result = np.abs(fft_result)
+        for j in fft_coefficients:
+            features[:, index : index + n_quantities] = abs_fft_result[:, j, :]
+            new_names += [n + f"_absFftCoeff{j}" for n in names]
+            index += n_quantities
+        print("Done with fft_coefficients calculation")
+
+    if mean_kpar or argmax_kpar:
+        new_features, kpar_names = compute_mean_k_parallel(
+            tensor, names, include_argmax=True
+        )
+        if mean_kpar:
+            features[:, index : index + n_quantities] = new_features[:, :n_quantities]
+            new_names += kpar_names[:n_quantities]
+            index += n_quantities
+            print("Done with mean_kpar calculation")
+        if argmax_kpar:
+            features[:, index : index + n_quantities] = new_features[:, n_quantities:]
+            new_names += kpar_names[n_quantities:]
+            index += n_quantities
+            print("Done with argmax_kpar calculation")
+
+    df = pd.DataFrame(features, columns=new_names)
+    print("Done with compute_reductions")
+    return df

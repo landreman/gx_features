@@ -89,28 +89,30 @@ def create_threshold_masks(
     return masks, mask_names
 
 
-def make_feature_mask_combinations(feature_tensor, quantity_names, masks, mask_names):
-    n_data, n_z, n_quantities = feature_tensor.shape
-    assert masks.shape[0] == n_data
-    assert masks.shape[1] == n_z
-    n_masks = masks.shape[2]
-    mask_names_with_underscores = []
-    for mask_name in mask_names:
-        if mask_name == "":
-            mask_names_with_underscores.append("")
+def make_pairwise_products_from_2_sets(
+    feature_tensor1, names1, feature_tensor2, names2
+):
+    n_data, n_z, n_quantities1 = feature_tensor1.shape
+    assert feature_tensor2.shape[0] == n_data
+    assert feature_tensor2.shape[1] == n_z
+    n_quantities2 = feature_tensor2.shape[2]
+    names2_with_underscores = []
+    for name in names2:
+        if name == "":
+            names2_with_underscores.append("")
         else:
-            mask_names_with_underscores.append("_" + mask_name)
+            names2_with_underscores.append("_" + name)
 
-    feature_mask_combinations = np.zeros((n_data, n_z, n_quantities * n_masks))
+    combinations_tensor = np.zeros((n_data, n_z, n_quantities1 * n_quantities2))
     names = []
-    for i in range(n_masks):
-        feature_mask_combinations[:, :, i * n_quantities : (i + 1) * n_quantities] = (
-            feature_tensor * masks[:, :, i][:, :, None]
+    for i in range(n_quantities2):
+        combinations_tensor[:, :, i * n_quantities1 : (i + 1) * n_quantities1] = (
+            feature_tensor1 * feature_tensor2[:, :, i][:, :, None]
         )
-        for quantity_name in quantity_names:
-            names.append(quantity_name + mask_names_with_underscores[i])
+        for quantity_name in names1:
+            names.append(quantity_name + names2_with_underscores[i])
 
-    return feature_mask_combinations, names
+    return combinations_tensor, names
 
 
 def make_feature_product_combinations(feature_tensor, names):

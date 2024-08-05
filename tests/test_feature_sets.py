@@ -1,7 +1,12 @@
 import unittest
 import numpy as np
 
-from gx_features.feature_sets import create_tensors_20240725_01, create_features_20240726_01, create_features_20240804_01
+from gx_features.feature_sets import (
+    create_tensors_20240725_01,
+    create_features_20240726_01,
+    create_features_20240804_01,
+    create_features_20240805_01,
+)
 
 
 class Tests(unittest.TestCase):
@@ -24,3 +29,6 @@ class Tests(unittest.TestCase):
 
     def test_create_features_20240804_01(self):
         create_features_20240804_01(10)
+
+    def test_create_features_20240805_01(self):
+        create_features_20240805_01(10)

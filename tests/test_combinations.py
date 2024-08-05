@@ -6,7 +6,7 @@ from gx_features.combinations import (
     add_local_shear,
     remove_cvdrift,
     create_masks,
-    make_feature_mask_combinations,
+    make_pairwise_products_from_2_sets,
     make_feature_product_combinations,
     make_feature_quotient_combinations,
     make_inverse_quantities,
@@ -152,7 +152,7 @@ class Tests(unittest.TestCase):
     def test_feature_mask_combinations(self):
         feature_tensor, names, Y = load_tensor("test")
         masks, mask_names = create_masks(feature_tensor)
-        combinations, names = make_feature_mask_combinations(
+        combinations, names = make_pairwise_products_from_2_sets(
             feature_tensor, names, masks, mask_names
         )
         print(names)

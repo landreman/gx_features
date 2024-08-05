@@ -11,12 +11,16 @@ from tsfresh import extract_features
 import lightgbm as lgb
 
 from .io import load_tensor
-from .calculations import compute_mean_k_parallel, compute_max_minus_min
+from .calculations import (
+    compute_mean_k_parallel,
+    compute_max_minus_min,
+    compute_reductions,
+)
 from .combinations import (
     add_local_shear,
     create_masks,
     create_threshold_masks,
-    make_feature_mask_combinations,
+    make_pairwise_products_from_2_sets,
     make_feature_product_combinations,
     combine_tensors,
     make_feature_product_and_quotient_combinations,
@@ -32,6 +36,7 @@ from .utils import (
 )
 
 n_logical_threads = psutil.cpu_count(logical=True)
+
 
 def create_tensors_20240725_01(dataset):
     raw_tensor, raw_names, Y = load_tensor(dataset)
@@ -50,13 +55,15 @@ def create_tensors_20240725_01(dataset):
     )
 
     # Create single-feature-mask combinations:
-    feature_mask_tensor, feature_mask_names = make_feature_mask_combinations(
+    feature_mask_tensor, feature_mask_names = make_pairwise_products_from_2_sets(
         single_quantity_tensor, single_quantity_names, masks, mask_names
     )
 
     # Create feature-pair-mask combinations:
-    feature_pair_mask_tensor, feature_pair_mask_names = make_feature_mask_combinations(
-        feature_product_tensor, feature_product_names, masks, mask_names
+    feature_pair_mask_tensor, feature_pair_mask_names = (
+        make_pairwise_products_from_2_sets(
+            feature_product_tensor, feature_product_names, masks, mask_names
+        )
     )
 
     combinations_tensor, combinations_names = combine_tensors(
@@ -265,7 +272,7 @@ def create_multithreshold_gbdrift_masked_gds22_features():
     masks, mask_names = create_threshold_masks(gbdrift)
 
     # Create single-feature-mask combinations:
-    feature_mask_tensor, feature_mask_names = make_feature_mask_combinations(
+    feature_mask_tensor, feature_mask_names = make_pairwise_products_from_2_sets(
         raw_tensor, raw_names, masks, mask_names
     )
     print("feature_mask_names:")
@@ -516,8 +523,8 @@ def create_features_20240804_01(n_data=None):
     M, M_names = heaviside_transformations(F, F_names)
     print("M_names:", M_names)
 
-    MF, MF_names = make_feature_mask_combinations(F, F_names, M, M_names)
-    MCF, MCF_names = make_feature_mask_combinations(CF, CF_names, M, M_names)
+    MF, MF_names = make_pairwise_products_from_2_sets(F, F_names, M, M_names)
+    MCF, MCF_names = make_pairwise_products_from_2_sets(CF, CF_names, M, M_names)
 
     tensor_before_inv_bmag, names_before_inv_bmag = combine_tensors(
         F, F_names, MF, MF_names, CF, CF_names, MCF, MCF_names
@@ -543,6 +550,7 @@ def create_features_20240804_01(n_data=None):
     # Now apply reductions.
     ###########################################################################
 
+    """
     # First compute any custom features:
 
     custom_features1, custom_features_names1 = compute_mean_k_parallel(
@@ -606,6 +614,25 @@ def create_features_20240804_01(n_data=None):
     )
 
     extracted_features = extracted_features_from_tsfresh.join(custom_features_df)
+    """
+
+    extracted_features = compute_reductions(
+        tensor,
+        names,
+        max=True,
+        min=True,
+        max_minus_min=True,
+        mean=True,
+        median=True,
+        rms=True,
+        variance=True,
+        skewness=True,
+        quantiles=[0.1, 0.2, 0.3, 0.4, 0.6, 0.7, 0.8, 0.9],
+        count_above=np.arange(-2, 6.1, 0.5),
+        fft_coefficients=[1, 2, 3],
+        mean_kpar=True,
+        argmax_kpar=True,
+    )
 
     print(
         "Number of features before dropping nearly constant features:",
@@ -622,6 +649,198 @@ def create_features_20240804_01(n_data=None):
     drop_special_characters_from_column_names(features)
 
     filename = "20240726-01-kpar_and_pair_mask_features_20240804_01"
+
+    features.to_pickle(filename + ".pkl")
+
+
+def create_features_20240805_01(n_data=None):
+    """
+    These features are all variations on gds22 * Heaviside(gbdrift),
+    attempting only to get an optimal 1st feature.
+
+    If n_data is None, all data entries will be used.
+    If n_data is an integer, the data will be trimmed to the first n_data entries.
+    """
+    raw_tensor, raw_names, Y = load_tensor("20240726")
+    raw_names = simplify_names(raw_names)
+
+    if n_data is not None:
+        raw_tensor = raw_tensor[:n_data, :, :]
+        Y = Y[:n_data]
+
+    n_data, n_z, n_quantities = raw_tensor.shape
+
+    index = 1
+    gbdrift = raw_tensor[:, :, index]
+    assert raw_names[index] == "gbdrift"
+
+    index = 5
+    gds22 = raw_tensor[:, :, index]
+    assert raw_names[index] == "gds22"
+
+    index = 0
+    bmag = raw_tensor[:, :, index]
+    assert raw_names[index] == "bmag"
+
+    n_activation_functions = 5
+    thresholds = np.arange(-1, 1.05, 0.1)
+    n_thresholds = len(thresholds)
+    activation_functions = np.zeros(
+        (n_data, n_z, n_thresholds * n_activation_functions)
+    )
+    activation_function_names = []
+    for j_activation_function in range(n_activation_functions):
+        for j_threshold, threshold in enumerate(thresholds):
+            index = j_activation_function * n_thresholds + j_threshold
+            x = gds22 - threshold
+            if j_activation_function == 0:
+                activation_functions[:, :, index] = np.heaviside(x, 0)
+                name = f"heaviside_{threshold:.2f}"
+            elif j_activation_function == 1:
+                activation_functions[:, :, index] = 1 / (1 + np.exp(-x))
+                name = f"sigmoid_{threshold:.2f}"
+            elif j_activation_function == 2:
+                alpha = 0.05
+                activation_functions[:, :, index] = alpha + (1 - alpha) * np.heaviside(
+                    x, 0
+                )
+                name = f"leakyHeaviside{alpha:.2f}_{threshold:.2f}"
+            elif j_activation_function == 3:
+                alpha = 0.1
+                activation_functions[:, :, index] = alpha + (1 - alpha) * np.heaviside(
+                    x, 0
+                )
+                name = f"leakyHeaviside{alpha:.2f}_{threshold:.2f}"
+            elif j_activation_function == 4:
+                alpha = 0.2
+                activation_functions[:, :, index] = alpha + (1 - alpha) * np.heaviside(
+                    x, 0
+                )
+                name = f"leakyHeaviside{alpha:.2f}_{threshold:.2f}"
+            else:
+                raise RuntimeError("Should not get here")
+            activation_function_names.append(name)
+    print("activation_function_names:", activation_function_names)
+
+    powers_of_gds22 = [0.5, 1, 2]
+    powers_of_gbdrift = [
+        0,
+        1,
+    ]  # Fractional powers disallowed because gbdrift can be <0.
+    n_powers_of_gds22 = len(powers_of_gds22)
+    n_powers_of_gbdrift = len(powers_of_gbdrift)
+
+    powers_of_gds2_tensor = np.zeros((n_data, n_z, n_powers_of_gds22))
+    powers_of_gbdrift_tensor = np.zeros((n_data, n_z, n_powers_of_gbdrift))
+    powers_of_gds2_names = []
+    powers_of_gbdrift_names = []
+    for j_power, power in enumerate(powers_of_gds22):
+        powers_of_gds2_tensor[:, :, j_power] = gds22**power
+        powers_of_gds2_names.append(f"gds22^{power}")
+
+    for j_power, power in enumerate(powers_of_gbdrift):
+        powers_of_gbdrift_tensor[:, :, j_power] = gbdrift**power
+        powers_of_gbdrift_names.append(f"gbdrift^{power}")
+
+    gbdrift_gds2_tensor, gbdrift_gds2_names = make_pairwise_products_from_2_sets(
+        powers_of_gbdrift_tensor,
+        powers_of_gbdrift_names,
+        powers_of_gds2_tensor,
+        powers_of_gds2_names,
+    )
+    print("gbdrift_gds2_names:", gbdrift_gds2_names)
+
+    tensor_before_inv_bmag, names_before_inv_bmag = make_pairwise_products_from_2_sets(
+        gbdrift_gds2_tensor,
+        gbdrift_gds2_names,
+        activation_functions,
+        activation_function_names,
+    )
+
+    tensor_after_inv_bmag, names_after_inv_bmag = divide_by_quantity(
+        tensor_before_inv_bmag, names_before_inv_bmag, bmag, "bmag"
+    )
+
+    tensor, names = combine_tensors(
+        tensor_before_inv_bmag,
+        names_before_inv_bmag,
+        tensor_after_inv_bmag,
+        names_after_inv_bmag,
+    )
+
+    print("\nQuantities before reduction:\n")
+    for n in names:
+        print(n)
+    print("\nNumber of quantities before reduction:", len(names))
+
+    ###########################################################################
+    # Now apply reductions.
+    ###########################################################################
+
+    count_above_thresholds = np.arange(0.5, 10.1, 0.5)
+    count_above_params = [{"t": t} for t in count_above_thresholds]
+    print("count_above_params:", count_above_params)
+
+    """
+    tsfresh_feature_options = {
+        "count_above": count_above_params,
+        "maximum": None,
+        "mean": None,
+        "median": None,
+        "quantile": [
+            {"q": 0.1},
+            {"q": 0.2},
+            {"q": 0.3333},
+            {"q": 0.6667},
+            {"q": 0.8},
+            {"q": 0.9},
+        ],
+        "root_mean_square": None,
+        "variance": None,
+    }
+
+    df_for_tsfresh = tensor_to_tsfresh_dataframe(tensor, names)
+    print("n_jobs for tsfresh:", n_logical_threads)
+    extracted_features = extract_features(
+        df_for_tsfresh,
+        column_id="j_tube",
+        column_sort="z",
+        default_fc_parameters=tsfresh_feature_options,
+        n_jobs=n_logical_threads,
+    )
+    print(
+        "Number of tsfresh features:",
+        len(extracted_features.columns),
+    )
+    """
+
+    extracted_features = compute_reductions(
+        tensor,
+        names,
+        max=True,
+        mean=True,
+        median=True,
+        rms=True,
+        variance=True,
+        quantiles=[0.1, 0.2, 0.3333, 0.6667, 0.8, 0.9],
+        count_above=count_above_thresholds,
+    )
+
+    print(
+        "Number of features before dropping nearly constant features:",
+        extracted_features.shape[1],
+    )
+    features = drop_nearly_constant_features(extracted_features)
+
+    print("\n****** Final features ******\n")
+    for f in features.columns:
+        print(f)
+    print("Final number of features:", features.shape[1])
+
+    features["Y"] = Y
+    drop_special_characters_from_column_names(features)
+
+    filename = "20240726-01-gbdrift_gds22_combo_features_20240805_01"
 
     features.to_pickle(filename + ".pkl")
 

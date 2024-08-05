@@ -1,11 +1,15 @@
 import unittest
 import numpy as np
+from tsfresh import extract_features
 
 from gx_features.calculations import (
     differentiate,
     compute_mean_k_parallel,
     compute_longest_nonzero_interval,
+    compute_reductions,
 )
+from gx_features.io import load_tensor
+from gx_features.utils import tensor_to_tsfresh_dataframe, simplify_names
 
 
 class Tests(unittest.TestCase):
@@ -165,7 +169,9 @@ class Tests(unittest.TestCase):
         names = ["foo", "bar", "yaz"]
         for include_argmax in [False, True]:
             features, new_names = compute_mean_k_parallel(
-                raw_features, names, include_argmax=include_argmax,
+                raw_features,
+                names,
+                include_argmax=include_argmax,
             )
 
     def test_compute_longest_nonzero_interval(self):
@@ -188,3 +194,70 @@ class Tests(unittest.TestCase):
         np.testing.assert_allclose(features[:, 1], 2)
         np.testing.assert_allclose(features[:, 2], 2)
         np.testing.assert_allclose(features[:, 3], 7)
+
+    def test_compute_reductions(self):
+        """My reduction functions should be equivalent to the tsfresh ones."""
+        tensor, names, Y = load_tensor("test")
+        n_data, n_z, n_quantities = tensor.shape
+        names = simplify_names(names)
+        df1 = compute_reductions(
+            tensor,
+            names,
+            max=True,
+            min=True,
+            mean=True,
+            median=True,
+            rms=True,
+            variance=True,
+            skewness=True,
+            quantiles=[0.1, 0.7],
+            count_above=[0, 1.2],
+            fft_coefficients=[2, 3, 4],
+        )
+        print(df1)
+
+        tsfresh_feature_options = {
+            "maximum": None,
+            "minimum": None,
+            "mean": None,
+            "median": None,
+            "root_mean_square": None,
+            "variance": None,
+            "skewness": None,
+            "quantile": [{"q": 0.1}, {"q": 0.7}],
+            "count_above": [{"t": 0}, {"t": 1.2}],
+            "fft_coefficient": [
+                {"attr": "abs", "coeff": 2},
+                {"attr": "abs", "coeff": 3},
+                {"attr": "abs", "coeff": 4},
+            ],
+        }
+
+        df_for_tsfresh = tensor_to_tsfresh_dataframe(tensor, names)
+        df2 = extract_features(
+            df_for_tsfresh,
+            column_id="j_tube",
+            column_sort="z",
+            default_fc_parameters=tsfresh_feature_options,
+        )
+        print(df2)
+
+        array1 = df1.to_numpy()
+        array2 = df2.to_numpy()
+        assert array1.shape == array2.shape
+        n_features_per_quantity = int(array1.shape[1] / n_quantities)
+        array2_rearranged = np.zeros_like(array1)
+        for j_quantity in range(n_quantities):
+            array2_rearranged[:, j_quantity::n_quantities] = array2[
+                :,
+                j_quantity
+                * n_features_per_quantity : (j_quantity + 1)
+                * n_features_per_quantity,
+            ]
+
+        # np.set_printoptions(linewidth=400)
+        # print("array1:")
+        # print(array1)
+        # print("array2_rearranged:")
+        # print(array2_rearranged)
+        np.testing.assert_allclose(array1, array2_rearranged, atol=1e-13)
