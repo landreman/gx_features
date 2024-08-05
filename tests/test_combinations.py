@@ -315,6 +315,33 @@ class Tests(unittest.TestCase):
         np.testing.assert_allclose(inverse_tensor[:, :, 1], 1 / feature_tensor[:, :, 4])
         np.testing.assert_allclose(inverse_tensor[:, :, 2], 1 / feature_tensor[:, :, 6])
 
+    def test_make_feature_products_with_inverses(self):
+        """Make sure a quantity is not multiplied by its own inverse"""
+        feature_tensor, names, Y = load_tensor("test")
+        n_quantities = 2
+        feature_tensor = feature_tensor[:, :, :n_quantities]
+        names = names[:n_quantities]
+        inverse_tensor, inverse_names = make_inverse_quantities(feature_tensor, names)
+
+        tensor = np.concatenate((feature_tensor, inverse_tensor), axis=2)
+        names = names + inverse_names
+        print("names:", names)
+        product_features, product_names = make_feature_product_combinations(
+            tensor, names
+        )
+        assert product_names == [
+            "bmag_x_gbdrift",
+            "gbdrift_x_1/bmag",
+        ]
+        n_data, n_z, _ = feature_tensor.shape
+        assert product_features.shape == (n_data, n_z, 2)
+        np.testing.assert_allclose(
+            product_features[:, :, 0], feature_tensor[:, :, 0] * feature_tensor[:, :, 1]
+        )
+        np.testing.assert_allclose(
+            product_features[:, :, 1], feature_tensor[:, :, 1] / feature_tensor[:, :, 0]
+        )
+
     def test_make_feature_product_and_quotient_combinations(self):
         # First try the first 3 features:
 

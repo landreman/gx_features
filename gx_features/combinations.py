@@ -121,12 +121,19 @@ def make_feature_product_combinations(feature_tensor, names):
     j = 0
     for i in range(n_quantities):
         for k in range(i + 1, n_quantities):
+            if names[i] == "1/" + names[k] or names[k] == "1/" + names[i]:
+                # Don't multiply a feature by its own inverse
+                n_combinations -= 1
+                continue
+
             tensor_product_combinations[:, :, j] = (
                 feature_tensor[:, :, i] * feature_tensor[:, :, k]
             )
             combination_names.append(names[i] + "_x_" + names[k])
             j += 1
     assert j == n_combinations
+
+    tensor_product_combinations = tensor_product_combinations[:, :, :n_combinations]
 
     return tensor_product_combinations, combination_names
 
