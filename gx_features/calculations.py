@@ -199,6 +199,7 @@ def compute_reductions(
 ):
     print("Beginning compute_reductions")
     n_data, n_z, n_quantities = tensor.shape
+    assert len(names) == n_quantities
 
     n_features = 0
     if max:
@@ -274,7 +275,9 @@ def compute_reductions(
         print("Done with variance calculation")
 
     if skewness:
-        features[:, index : index + n_quantities] = skew(tensor, axis=1, bias=False)
+        skew_data = skew(tensor, axis=1, bias=False)
+        # If any of the quantities are constant, skewness will be NaN.
+        features[:, index : index + n_quantities] = np.nan_to_num(skew_data)
         new_names += [n + "_skewness" for n in names]
         index += n_quantities
         print("Done with skewness calculation")
@@ -307,6 +310,7 @@ def compute_reductions(
         new_features, kpar_names = compute_mean_k_parallel(
             tensor, names, include_argmax=True
         )
+        assert len(kpar_names) == 2 * n_quantities
         if mean_kpar:
             features[:, index : index + n_quantities] = new_features[:, :n_quantities]
             new_names += kpar_names[:n_quantities]
@@ -318,6 +322,8 @@ def compute_reductions(
             index += n_quantities
             print("Done with argmax_kpar calculation")
 
+    assert len(new_names) == features.shape[1]
+    assert index == n_features_total
     df = pd.DataFrame(features, columns=new_names)
     print("Done with compute_reductions")
     return df

@@ -509,6 +509,8 @@ def create_features_20240804_01(n_data=None):
     if n_data is not None:
         raw_tensor = raw_tensor[:n_data, :, :]
         Y = Y[:n_data]
+    # raw_tensor = raw_tensor[3070:, :, :]
+    # Y = Y[3070:]
 
     # Add local shear as a feature:
     F, F_names = add_local_shear(raw_tensor, raw_names, include_integral=False)
@@ -641,12 +643,14 @@ def create_features_20240804_01(n_data=None):
     # Check for any NaNs
     nan_locations = np.nonzero(np.isnan(extracted_features.to_numpy()))
     if len(nan_locations[0]) > 0:
+        columns = extracted_features.columns
         for j in range(len(nan_locations[0])):
             print(
                 "NaN found at row",
                 nan_locations[0][j],
                 "and column",
                 nan_locations[1][j],
+                columns[nan_locations[1][j]],
             )
     else:
         print("No NaNs found")
