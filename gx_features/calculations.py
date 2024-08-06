@@ -136,23 +136,23 @@ def compute_mask_for_longest_true_interval(data):
 
     data should have shape (n_data, n_z, n_quantities) and have dtype=bool.
     """
+    print("Beginning compute_mask_for_longest_true_interval")
     n_data, n_z, n_quantities = data.shape
 
     zero_padding = np.zeros((n_data, 1, n_quantities))
-    nonzeros3 = np.concatenate(
-        (zero_padding, data, data, data, zero_padding), axis=1
-    )
+    nonzeros3 = np.concatenate((zero_padding, data, data, data, zero_padding), axis=1)
     diff = nonzeros3[:, 1:, :] - nonzeros3[:, :-1, :]
+    # np.set_printoptions(linewidth=400)
 
-    features = np.zeros((n_data, n_quantities))
+    features = np.zeros((n_data, n_z, n_quantities))
     for j_data in range(n_data):
         for j_quantity in range(n_quantities):
             starts = np.nonzero(diff[j_data, :, j_quantity] > 0.5)[0]
             ends = np.nonzero(diff[j_data, :, j_quantity] < -0.5)[0]
             interval_lengths = ends - starts
-            # print(f"j_data: {j_data}, j_quantity: {j_quantity}")
-            # print("nonzeros:")
-            # print(nonzeros[j_data, :, j_quantity])
+            # print(f"\nj_data: {j_data}, j_quantity: {j_quantity}")
+            # print("data:")
+            # print(data[j_data, :, j_quantity])
             # print("nonzeros3:")
             # print(nonzeros3[j_data, :, j_quantity])
             # print("diff:")
@@ -162,12 +162,29 @@ def compute_mask_for_longest_true_interval(data):
             assert len(starts) == len(ends)
             # If the array happens to be all 0's for a certain data entry,
             # starts and ends will be [], so max will fail.
-            if len(starts) > 0:
-                j_longest_interval = np.argmax(interval_lengths)
-                start = max(starts[j_longest_interval] - n_z - 1, 0)
-                end = min(ends[j_longest_interval] - n_z - 1, n_z)
-                features[j_data, j_quantity, start:end] = 1
+            if len(starts) == 0:
+                continue
 
+            j_longest_interval = np.argmax(interval_lengths)
+            start = starts[j_longest_interval] + 1
+            end = ends[j_longest_interval] + 1
+            # print("j_longest_interval:", j_longest_interval, "start:", start, "end:", end)
+
+            arr = np.zeros(3 * n_z + 2)
+            arr[start:end] = 1
+
+            arr2 = arr[1:-1]
+            arr3 = np.roll(arr2, n_z)
+            arr4 = np.roll(arr3, n_z)
+            arr5 = np.logical_or(np.logical_or(arr2, arr3), arr4)
+            # print("arr: ", arr)
+            # print("arr2:", arr2)
+            # print("arr3:", arr3)
+            # print("arr4:", arr4)
+            # print("arr5:", arr5)
+            features[j_data, :, j_quantity] = arr5[:n_z]
+
+    print("Done with compute_mask_for_longest_true_interval")
     return features
 
 

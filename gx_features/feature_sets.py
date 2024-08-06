@@ -744,13 +744,17 @@ def create_features_20240805_01(n_data=None):
         0,
         1,
     ]  # Fractional powers disallowed because gbdrift can be <0.
+    powers_of_bmag = [0, -1, -2]
     n_powers_of_gds22 = len(powers_of_gds22)
     n_powers_of_gbdrift = len(powers_of_gbdrift)
+    n_powers_of_bmag = len(powers_of_bmag)
 
     powers_of_gds2_tensor = np.zeros((n_data, n_z, n_powers_of_gds22))
     powers_of_gbdrift_tensor = np.zeros((n_data, n_z, n_powers_of_gbdrift))
+    powers_of_bmag_tensor = np.zeros((n_data, n_z, n_powers_of_bmag))
     powers_of_gds2_names = []
     powers_of_gbdrift_names = []
+    powers_of_bmag_names = []
     for j_power, power in enumerate(powers_of_gds22):
         powers_of_gds2_tensor[:, :, j_power] = gds22**power
         powers_of_gds2_names.append(f"gds22^{power}")
@@ -758,6 +762,10 @@ def create_features_20240805_01(n_data=None):
     for j_power, power in enumerate(powers_of_gbdrift):
         powers_of_gbdrift_tensor[:, :, j_power] = gbdrift**power
         powers_of_gbdrift_names.append(f"gbdrift^{power}")
+
+    for j_power, power in enumerate(powers_of_bmag):
+        powers_of_bmag_tensor[:, :, j_power] = bmag**power
+        powers_of_bmag_names.append(f"bmag^{power}")
 
     gbdrift_gds2_tensor, gbdrift_gds2_names = make_pairwise_products_from_2_sets(
         powers_of_gbdrift_tensor,
@@ -767,22 +775,11 @@ def create_features_20240805_01(n_data=None):
     )
     print("gbdrift_gds2_names:", gbdrift_gds2_names)
 
-    tensor_before_inv_bmag, names_before_inv_bmag = make_pairwise_products_from_2_sets(
+    tensor, names = make_pairwise_products_from_2_sets(
         gbdrift_gds2_tensor,
         gbdrift_gds2_names,
-        activation_functions,
-        activation_function_names,
-    )
-
-    tensor_after_inv_bmag, names_after_inv_bmag = divide_by_quantity(
-        tensor_before_inv_bmag, names_before_inv_bmag, bmag, "bmag"
-    )
-
-    tensor, names = combine_tensors(
-        tensor_before_inv_bmag,
-        names_before_inv_bmag,
-        tensor_after_inv_bmag,
-        names_after_inv_bmag,
+        powers_of_bmag_tensor,
+        powers_of_bmag_names,
     )
 
     print("\nQuantities before reduction:\n")

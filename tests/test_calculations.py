@@ -196,7 +196,6 @@ class Tests(unittest.TestCase):
         np.testing.assert_allclose(features[:, 2], 2)
         np.testing.assert_allclose(features[:, 3], 7)
 
-    @unittest.skip
     def test_compute_mask_for_longest_true_interval(self):
         n_z = 8
         n_data = n_z + 1
@@ -205,22 +204,30 @@ class Tests(unittest.TestCase):
         features_should_be = np.zeros((n_data, n_z, n_quantities))
         raw_features[0, :, 0] = np.full(n_z, True)
         raw_features[0, :, 2] = [1, 1, 1, 0, 0, 0, 1, 0]
-        raw_features[0, :, 3] = [0, 1, 1, 0, 0, 1, 1, 0]
+        raw_features[0, :, 3] = [1, 1, 0, 1, 0, 0, 1, 1]
         raw_features[0, :, 4] = [0, 1, 0, 0, 1, 0, 1, 1]
         raw_features[0, :, 5] = [0, 1, 1, 1, 1, 1, 1, 1]
 
-        # features_should_be[0, :, 0] = 
+        features_should_be[0, :, 0] = np.ones(n_z)
+        features_should_be[0, :, 2] = [1, 1, 1, 0, 0, 0, 0, 0]
+        features_should_be[0, :, 3] = [1, 1, 0, 0, 0, 0, 1, 1]
+        features_should_be[0, :, 4] = [0, 0, 0, 0, 0, 0, 1, 1]
+        features_should_be[0, :, 5] = [0, 1, 1, 1, 1, 1, 1, 1]
 
         for j in range(1, n_data):
             raw_features[j, :, :] = np.roll(raw_features[0, :, :], j, axis=0)
+            features_should_be[j, :, :] = np.roll(
+                features_should_be[0, :, :], j, axis=0
+            )
         names = ["foo", "bar", "baz", "qux", "zim", "fap"]
 
-        features = compute_mask_for_longest_true_interval(raw_features)
-        assert features.shape == (n_data, n_quantities - 2)
-        np.testing.assert_allclose(features[:, 0], 3)
-        np.testing.assert_allclose(features[:, 1], 2)
-        np.testing.assert_allclose(features[:, 2], 2)
-        np.testing.assert_allclose(features[:, 3], 7)
+        mask = compute_mask_for_longest_true_interval(raw_features)
+        assert mask.shape == (n_data, n_z, n_quantities)
+        np.testing.assert_allclose(mask, features_should_be, atol=1e-14)
+        # for j_data in range(n_data):
+        #     for j_quantity in range(n_quantities):
+        #         print("j_data:", j_data, "j_quantity:", j_quantity)
+        #         np.testing.assert_allclose(mask[j_data, :, j_quantity], features_should_be[j_data, :, j_quantity])
 
     def test_compute_reductions(self):
         """My reduction functions should be equivalent to the tsfresh ones."""
