@@ -15,6 +15,7 @@ from .calculations import (
     compute_mean_k_parallel,
     compute_max_minus_min,
     compute_reductions,
+    compute_mask_for_longest_true_interval,
 )
 from .combinations import (
     add_local_shear,
@@ -699,12 +700,14 @@ def create_features_20240805_01(n_data=None):
     bmag = raw_tensor[:, :, index]
     assert raw_names[index] == "bmag"
 
-    n_activation_functions = 5
+    n_activation_functions = 6
     thresholds = np.arange(-1, 1.05, 0.1)
     n_thresholds = len(thresholds)
     activation_functions = np.zeros(
         (n_data, n_z, n_thresholds * n_activation_functions)
     )
+    longest_true_interval_masks = compute_mask_for_longest_true_interval(gds22[:, :, None] - thresholds[None, None, :] > 0)
+
     activation_function_names = []
     for j_activation_function in range(n_activation_functions):
         for j_threshold, threshold in enumerate(thresholds):
@@ -712,10 +715,10 @@ def create_features_20240805_01(n_data=None):
             x = gds22 - threshold
             if j_activation_function == 0:
                 activation_functions[:, :, index] = np.heaviside(x, 0)
-                name = f"heaviside_{threshold:.2f}"
+                name = f"heaviside{threshold:.2f}"
             elif j_activation_function == 1:
                 activation_functions[:, :, index] = 1 / (1 + np.exp(-x))
-                name = f"sigmoid_{threshold:.2f}"
+                name = f"sigmoid{threshold:.2f}"
             elif j_activation_function == 2:
                 alpha = 0.05
                 activation_functions[:, :, index] = alpha + (1 - alpha) * np.heaviside(
@@ -734,6 +737,9 @@ def create_features_20240805_01(n_data=None):
                     x, 0
                 )
                 name = f"leakyHeaviside{alpha:.2f}_{threshold:.2f}"
+            elif j_activation_function == 5:
+                activation_functions[:, :, index] = longest_true_interval_masks[:, :, j_threshold]
+                name = f"longestGbdriftPosInterval{threshold:.2f}"
             else:
                 raise RuntimeError("Should not get here")
             activation_function_names.append(name)
@@ -775,11 +781,18 @@ def create_features_20240805_01(n_data=None):
     )
     print("gbdrift_gds2_names:", gbdrift_gds2_names)
 
-    tensor, names = make_pairwise_products_from_2_sets(
+    gbdrift_gds2_bmag_tensor, gbdrift_gds2_bmag_names = make_pairwise_products_from_2_sets(
         gbdrift_gds2_tensor,
         gbdrift_gds2_names,
         powers_of_bmag_tensor,
         powers_of_bmag_names,
+    )
+
+    tensor, names = make_pairwise_products_from_2_sets(
+        gbdrift_gds2_bmag_tensor,
+        gbdrift_gds2_bmag_names,
+        activation_functions,
+        activation_function_names,
     )
 
     print("\nQuantities before reduction:\n")
