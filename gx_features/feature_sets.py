@@ -706,13 +706,13 @@ def create_features_20240805_01(n_data=None):
     activation_functions = np.zeros(
         (n_data, n_z, n_thresholds * n_activation_functions)
     )
-    longest_true_interval_masks = compute_mask_for_longest_true_interval(gds22[:, :, None] - thresholds[None, None, :] > 0)
+    longest_true_interval_masks = compute_mask_for_longest_true_interval(gbdrift[:, :, None] - thresholds[None, None, :] > 0)
 
     activation_function_names = []
     for j_activation_function in range(n_activation_functions):
         for j_threshold, threshold in enumerate(thresholds):
             index = j_activation_function * n_thresholds + j_threshold
-            x = gds22 - threshold
+            x = gbdrift - threshold
             if j_activation_function == 0:
                 activation_functions[:, :, index] = np.heaviside(x, 0)
                 name = f"heaviside{threshold:.2f}"
