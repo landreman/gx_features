@@ -6,7 +6,8 @@ import numpy as np
 def load_all(dataset):
     this_dir = os.path.dirname(os.path.abspath(__file__))
     test_file_dir = os.path.join(this_dir, "..", "tests", "files")
-    data_dir = "/Users/mattland/Box/work24"
+    #data_dir = "/Users/mattland/Box/work24"
+    data_dir = "."
     if dataset == "test":
         # File with the flux tube geometries (raw features):
         in_filename = os.path.join(test_file_dir, "test_data_in.pkl")

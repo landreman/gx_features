@@ -379,6 +379,19 @@ def plot_SFS_correlation(features_filename, SFS_filename, n_features):
     with open(SFS_filename, "rb") as file:
         sfs = pickle.load(file)
 
+    feature_set = sfs.subsets_[n_features]
+    print("Features kept:")
+    print(feature_set['feature_names'])
+    print()
+    print("indices:", feature_set['feature_idx'])
+    feature_name_list = list(feature_set['feature_names'])
+    print("feature_name_list:", feature_name_list)
+    #print(X_all.columns[list(feature_set['feature_idx'])])
+    #print(.columns[list(feature_set['feature_idx'])])
+    #X_all = X_all[feature_name_list]
+    #print(X_all.columns)
+    #exit(0)
+
     estimator = make_pipeline(
         ColumnSelector(cols=sfs.subsets_[n_features]['feature_idx']), 
         StandardScaler(), 
@@ -397,13 +410,15 @@ def plot_SFS_correlation(features_filename, SFS_filename, n_features):
     R2_test = estimator.score(X_test, Y_test)
     print("R2 on test set:", R2_test)
 
-    plt.figure(figsize=(6, 6))
-    plot_range = [-4, 4]
+    plt.figure(figsize=(4, 4))
+    plot_range = [-1, 4]
     plt.plot(plot_range, plot_range, ":", color="gray")
     plt.scatter(Y_test, estimator.predict(X_test), color="r", s=2, alpha=0.5)
     plt.xlabel("Actual log(heat flux) from GX")
     plt.ylabel("Predicted log(heat flux) from ML model")
-    plt.title(f"$R^2$ on unseen test data: {R2_test:.3}")
+    plt.title(f"Keeping {n_features} features\n$R^2$ on unseen test data: {R2_test:.3}")
+    plt.xlim(plot_range)
+    plt.ylim(plot_range)
 
     plt.tight_layout()
     plt.show()

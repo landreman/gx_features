@@ -292,9 +292,20 @@ def plot_SFS_results(filename, show=True):
             print()
         previous_features = features
 
+    print()
+    print("First feature added at each step:")
+    previous_features = set()
+    for j in range(max_n_features):
+        features = set(sfs.subsets_[j + 1]["feature_names"])
+        new_features = features - previous_features
+        removed_features = previous_features - features
+        print(f"{j + 1:2}: {list(new_features)[0]}")
+        previous_features = features
+    print()
+    
     fig1 = plot_sfs(sfs.get_metric_dict(), kind="std_dev")
 
-    plt.ylim(bottom=0)
+    plt.ylim(0, 1)
     plt.title("Sequential Forward Selection (w. StdDev)")
     plt.grid()
     plt.figtext(0.5, 0.005, filename, ha="center", va="bottom", fontsize=6)
