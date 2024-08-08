@@ -1,4 +1,5 @@
 import os
+import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 from pandas import read_pickle
@@ -16,6 +17,7 @@ from sklearn.neighbors import KNeighborsRegressor
 from sklearn.ensemble import RandomForestRegressor
 from lightgbm import LGBMRegressor
 from xgboost import XGBRegressor
+from mlxtend.feature_selection import ColumnSelector
 
 
 def assess_features_quick(
@@ -364,5 +366,44 @@ def hyperparam_search_lasso(features_filename):
         va="bottom",
         fontsize=6,
     )
+    plt.tight_layout()
+    plt.show()
+
+def plot_SFS_correlation(features_filename, SFS_filename, n_features):
+    print(f"Keeping {n_features} features")
+
+    data = read_pickle(features_filename)
+    Y_all = data["Y"]
+    X_all = data.drop(columns="Y")
+
+    with open(SFS_filename, "rb") as file:
+        sfs = pickle.load(file)
+
+    estimator = make_pipeline(
+        ColumnSelector(cols=sfs.subsets_[n_features]['feature_idx']), 
+        StandardScaler(), 
+        LGBMRegressor(),
+    )
+    folds = KFold(n_splits=5, shuffle=True, random_state=42)
+    scores = cross_val_score(
+        estimator, X_all, Y_all, cv=folds, scoring="r2", verbose=2
+    )
+    R2 = scores.mean()
+    print(f"    scores:", scores)
+    print(f"    R^2: {R2:.3}")
+
+    X_train, X_test, Y_train, Y_test = train_test_split(X_all, Y_all, test_size=0.2, random_state=42)
+    estimator.fit(X_train, Y_train)
+    R2_test = estimator.score(X_test, Y_test)
+    print("R2 on test set:", R2_test)
+
+    plt.figure(figsize=(6, 6))
+    plot_range = [-4, 4]
+    plt.plot(plot_range, plot_range, ":", color="gray")
+    plt.scatter(Y_test, estimator.predict(X_test), color="r", s=2, alpha=0.5)
+    plt.xlabel("Actual log(heat flux) from GX")
+    plt.ylabel("Predicted log(heat flux) from ML model")
+    plt.title(f"$R^2$ on unseen test data: {R2_test:.3}")
+
     plt.tight_layout()
     plt.show()
