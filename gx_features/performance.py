@@ -422,3 +422,32 @@ def plot_SFS_correlation(features_filename, SFS_filename, n_features):
 
     plt.tight_layout()
     plt.show()
+
+def plot_correlation_with_SFS_feature_1(features_filename, SFS_filename):
+    data = read_pickle(features_filename)
+    Y_all = data["Y"]
+
+    with open(SFS_filename, "rb") as file:
+        sfs = pickle.load(file)
+
+    feature_set = sfs.subsets_[1]
+    print("Features kept:")
+    print(feature_set['feature_names'])
+    print()
+    print("indices:", feature_set['feature_idx'])
+    feature_name_list = list(feature_set['feature_names'])
+    print("feature_name_list:", feature_name_list)
+    feature_name = feature_name_list[0]
+    feature = data[feature_name]
+
+    plt.figure(figsize=(4, 4))
+    plot_range = [-1, 4]
+    plt.plot(plot_range, plot_range, ":", color="gray")
+    plt.scatter(feature, Y_all, color="r", s=2, alpha=0.5)
+    plt.xlabel(feature_name)
+    plt.ylabel("Actual log(heat flux) from GX")
+    plt.xlim(plot_range)
+    plt.ylim(plot_range)
+
+    plt.tight_layout()
+    plt.show()
