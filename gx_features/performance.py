@@ -37,7 +37,8 @@ def assess_features_quick(
     if randomize_Y:
         Y_all = np.random.permutation(Y_all)
 
-    best_ridge_alpha = 268.26957952797216
+    # best_ridge_alpha = 268.26957952797216
+    best_ridge_alpha = 300.0
 
     best_kernel_ridge_alpha = 0.028840315031266057
     best_kernel_ridge_gamma = 0.00021134890398366476
@@ -196,7 +197,7 @@ def hyperparam_search_ridge(features_filename):
         X_all, Y_all, test_size=0.2, random_state=0
     )
 
-    alphas = 10.0 ** np.linspace(1, 3.2, 10)
+    alphas = 10.0 ** np.linspace(-3, 3, 30)
     # alphas = [100, 300]
     param_name = "ridge__alpha"
     param_grid = {param_name: alphas}
@@ -413,10 +414,11 @@ def plot_SFS_correlation(features_filename, SFS_filename, n_features):
     plt.figure(figsize=(4, 4))
     plot_range = [-1, 4]
     plt.plot(plot_range, plot_range, ":", color="gray")
-    plt.scatter(Y_test, estimator.predict(X_test), color="r", s=2, alpha=0.5)
+    plt.scatter(Y_test, estimator.predict(X_test), color="r", s=2, alpha=0.1)
     plt.xlabel("Actual log(heat flux) from GX")
     plt.ylabel("Predicted log(heat flux) from ML model")
-    plt.title(f"Keeping {n_features} features\n$R^2$ on unseen test data: {R2_test:.3}")
+    plural = "s" if n_features > 1 else ""
+    plt.title(f"Keeping {n_features} feature{plural}\n$R^2$ on unseen test data: {R2_test:.3}")
     plt.xlim(plot_range)
     plt.ylim(plot_range)
 
@@ -441,13 +443,9 @@ def plot_correlation_with_SFS_feature_1(features_filename, SFS_filename):
     feature = data[feature_name]
 
     plt.figure(figsize=(4, 4))
-    plot_range = [-1, 4]
-    plt.plot(plot_range, plot_range, ":", color="gray")
-    plt.scatter(feature, Y_all, color="r", s=2, alpha=0.5)
+    plt.scatter(feature, Y_all, color="r", s=2, alpha=0.1)
     plt.xlabel(feature_name)
     plt.ylabel("Actual log(heat flux) from GX")
-    plt.xlim(plot_range)
-    plt.ylim(plot_range)
 
     plt.tight_layout()
     plt.show()
