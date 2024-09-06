@@ -929,72 +929,6 @@ def create_features_20240906_01(n_data=None):
     # Now apply reductions.
     ###########################################################################
 
-    """
-    # First compute any custom features:
-
-    custom_features1, custom_features_names1 = compute_mean_k_parallel(
-        tensor, names, include_argmax=True
-    )
-    custom_features2, custom_features_names2 = compute_max_minus_min(
-        tensor, names,
-    )
-    custom_features = np.concatenate((custom_features1, custom_features2), axis=1)
-    custom_features_names = custom_features_names1 + custom_features_names2
-    custom_features_df = DataFrame(custom_features, columns=custom_features_names)
-    print("Number of custom features:", len(custom_features_names))
-
-    # Now compute the tsfresh features:
-
-    count_above_thresholds = np.arange(-2, 6.1, 0.5)
-    count_above_params = [{"t": t} for t in count_above_thresholds]
-    print("count_above_params:", count_above_params)
-
-    fft_coefficients = []
-    # Don't include the zeroth coefficient since this is just the mean,
-    # which we will include separately.
-    for j in range(1, 4):
-        fft_coefficients.append({"attr": "abs", "coeff": j})
-    print("fft_coefficients:", fft_coefficients)
-
-    tsfresh_feature_options = {
-        "count_above": count_above_params,
-        "fft_coefficient": fft_coefficients,
-        "maximum": None,
-        "mean": None,
-        "median": None,
-        "minimum": None,
-        "quantile": [
-            {"q": 0.1},
-            {"q": 0.2},
-            {"q": 0.3},
-            {"q": 0.4},
-            {"q": 0.6},
-            {"q": 0.7},
-            {"q": 0.8},
-            {"q": 0.9},
-        ],
-        "root_mean_square": None,
-        "skewness": None,
-        "variance": None,
-    }
-
-    df_for_tsfresh = tensor_to_tsfresh_dataframe(tensor, names)
-    print("n_jobs for tsfresh:", n_logical_threads)
-    extracted_features_from_tsfresh = extract_features(
-        df_for_tsfresh,
-        column_id="j_tube",
-        column_sort="z",
-        default_fc_parameters=tsfresh_feature_options,
-        n_jobs=n_logical_threads,
-    )
-    print(
-        "Number of tsfresh features:",
-        len(extracted_features_from_tsfresh.columns),
-    )
-
-    extracted_features = extracted_features_from_tsfresh.join(custom_features_df)
-    """
-
     extracted_features = compute_reductions(
         tensor,
         names,
@@ -1042,7 +976,7 @@ def create_features_20240906_01(n_data=None):
     features["Y"] = Y
     drop_special_characters_from_column_names(features)
 
-    filename = "20240726-01-kpar_and_pair_mask_features_20240804_01"
+    filename = "20240601-01_features_20240906_01"
 
     features.to_pickle(filename + ".pkl")
 
