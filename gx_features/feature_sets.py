@@ -872,6 +872,181 @@ def create_features_20240805_01(n_data=None):
     features.to_pickle(filename + ".pkl")
 
 
+def create_features_20240906_01(n_data=None):
+    """
+    Same as 20240804_01, but for finite-beta rather than vacuum, so cvdrift is
+    also included.
+
+    If n_data is None, all data entries will be used.
+    If n_data is an integer, the data will be trimmed to the first n_data entries.
+    """
+    raw_tensor, raw_names, Y = load_tensor("20240601")
+    raw_names = simplify_names(raw_names)
+
+    if n_data is not None:
+        raw_tensor = raw_tensor[:n_data, :, :]
+        Y = Y[:n_data]
+    # raw_tensor = raw_tensor[3070:, :, :]
+    # Y = Y[3070:]
+
+    # Add local shear as a feature:
+    F, F_names = add_local_shear(raw_tensor, raw_names, include_integral=False)
+
+    # Add inverse quantities:
+    inverse_tensor, inverse_names = make_inverse_quantities(F, F_names)
+    F, F_names = combine_tensors(F, F_names, inverse_tensor, inverse_names)
+
+    # CF, CF_names = make_feature_product_and_quotient_combinations(F, F_names)
+    CF, CF_names = make_feature_product_combinations(F, F_names)
+
+    M, M_names = heaviside_transformations(F, F_names)
+    print("M_names:", M_names)
+
+    MF, MF_names = make_pairwise_products_from_2_sets(F, F_names, M, M_names)
+    MCF, MCF_names = make_pairwise_products_from_2_sets(CF, CF_names, M, M_names)
+
+    tensor_before_inv_bmag, names_before_inv_bmag = combine_tensors(
+        F, F_names, MF, MF_names, CF, CF_names, MCF, MCF_names
+    )
+
+    tensor_after_inv_bmag, names_after_inv_bmag = divide_by_quantity(
+        tensor_before_inv_bmag, names_before_inv_bmag, raw_tensor[:, :, 0], "bmag"
+    )
+
+    tensor, names = combine_tensors(
+        tensor_before_inv_bmag,
+        names_before_inv_bmag,
+        tensor_after_inv_bmag,
+        names_after_inv_bmag,
+    )
+
+    print("\nQuantities before reduction:\n")
+    for n in names:
+        print(n)
+    print("\nNumber of quantities before reduction:", len(names))
+
+    ###########################################################################
+    # Now apply reductions.
+    ###########################################################################
+
+    """
+    # First compute any custom features:
+
+    custom_features1, custom_features_names1 = compute_mean_k_parallel(
+        tensor, names, include_argmax=True
+    )
+    custom_features2, custom_features_names2 = compute_max_minus_min(
+        tensor, names,
+    )
+    custom_features = np.concatenate((custom_features1, custom_features2), axis=1)
+    custom_features_names = custom_features_names1 + custom_features_names2
+    custom_features_df = DataFrame(custom_features, columns=custom_features_names)
+    print("Number of custom features:", len(custom_features_names))
+
+    # Now compute the tsfresh features:
+
+    count_above_thresholds = np.arange(-2, 6.1, 0.5)
+    count_above_params = [{"t": t} for t in count_above_thresholds]
+    print("count_above_params:", count_above_params)
+
+    fft_coefficients = []
+    # Don't include the zeroth coefficient since this is just the mean,
+    # which we will include separately.
+    for j in range(1, 4):
+        fft_coefficients.append({"attr": "abs", "coeff": j})
+    print("fft_coefficients:", fft_coefficients)
+
+    tsfresh_feature_options = {
+        "count_above": count_above_params,
+        "fft_coefficient": fft_coefficients,
+        "maximum": None,
+        "mean": None,
+        "median": None,
+        "minimum": None,
+        "quantile": [
+            {"q": 0.1},
+            {"q": 0.2},
+            {"q": 0.3},
+            {"q": 0.4},
+            {"q": 0.6},
+            {"q": 0.7},
+            {"q": 0.8},
+            {"q": 0.9},
+        ],
+        "root_mean_square": None,
+        "skewness": None,
+        "variance": None,
+    }
+
+    df_for_tsfresh = tensor_to_tsfresh_dataframe(tensor, names)
+    print("n_jobs for tsfresh:", n_logical_threads)
+    extracted_features_from_tsfresh = extract_features(
+        df_for_tsfresh,
+        column_id="j_tube",
+        column_sort="z",
+        default_fc_parameters=tsfresh_feature_options,
+        n_jobs=n_logical_threads,
+    )
+    print(
+        "Number of tsfresh features:",
+        len(extracted_features_from_tsfresh.columns),
+    )
+
+    extracted_features = extracted_features_from_tsfresh.join(custom_features_df)
+    """
+
+    extracted_features = compute_reductions(
+        tensor,
+        names,
+        max=True,
+        min=True,
+        max_minus_min=True,
+        mean=True,
+        median=True,
+        rms=True,
+        variance=True,
+        skewness=True,
+        quantiles=[0.1, 0.2, 0.3, 0.4, 0.6, 0.7, 0.8, 0.9],
+        count_above=np.arange(-2, 6.1, 0.5),
+        fft_coefficients=[1, 2, 3],
+        mean_kpar=True,
+        argmax_kpar=True,
+    )
+
+    print(
+        "Number of features before dropping nearly constant features:",
+        extracted_features.shape[1],
+    )
+    # Check for any NaNs
+    nan_locations = np.nonzero(np.isnan(extracted_features.to_numpy()))
+    if len(nan_locations[0]) > 0:
+        columns = extracted_features.columns
+        for j in range(len(nan_locations[0])):
+            print(
+                "NaN found at row",
+                nan_locations[0][j],
+                "and column",
+                nan_locations[1][j],
+                columns[nan_locations[1][j]],
+            )
+    else:
+        print("No NaNs found")
+
+    features = drop_nearly_constant_features(extracted_features)
+
+    print("\n****** Final features ******\n")
+    for f in features.columns:
+        print(f)
+    print("Final number of features:", features.shape[1])
+
+    features["Y"] = Y
+    drop_special_characters_from_column_names(features)
+
+    filename = "20240726-01-kpar_and_pair_mask_features_20240804_01"
+
+    features.to_pickle(filename + ".pkl")
+
+
 def create_test_features():
     raw_tensor, raw_names, Y = load_tensor("test")
     # n_data = 10, n_z = 96, n_quantities = 7
