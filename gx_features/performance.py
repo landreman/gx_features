@@ -449,3 +449,64 @@ def plot_correlation_with_SFS_feature_1(features_filename, SFS_filename):
 
     plt.tight_layout()
     plt.show()
+
+def plot_correlation_with_SFS_feature_1_and_model(features_filename, SFS_filename, regressor, check_R2=False):
+    data = read_pickle(features_filename)
+    Y_all = data["Y"]
+
+    with open(SFS_filename, "rb") as file:
+        sfs = pickle.load(file)
+
+    feature_set = sfs.subsets_[1]
+    print("Features kept:")
+    print(feature_set['feature_names'])
+    print()
+    print("indices:", feature_set['feature_idx'])
+    feature_name_list = list(feature_set['feature_names'])
+    print("feature_name_list:", feature_name_list)
+    feature_name = feature_name_list[0]
+    feature = data[feature_name]
+    # Make a feature array containing just the top 1 feature:
+    X_all_1_feature = feature.to_numpy().reshape((-1, 1))
+
+    regressor_str = str(regressor)
+    if regressor == "xgb":
+        regressor = XGBRegressor()
+    elif regressor == "lgbm":
+        regressor = LGBMRegressor()
+    elif regressor == "lgbm linear":
+        regressor = LGBMRegressor(linear_tree=True)
+    elif regressor == "knn":
+        regressor = KNeighborsRegressor(10)
+    elif regressor == "knn distance":
+        regressor = KNeighborsRegressor(n_neighbors=10, weights="distance")
+
+    estimator = make_pipeline(
+        StandardScaler(),
+        regressor,
+    )
+    if check_R2:
+        folds = KFold(n_splits=5, shuffle=True, random_state=42)
+        scores = cross_val_score(
+            estimator, X_all_1_feature, Y_all, cv=folds, scoring="r2", verbose=2
+        )
+        R2 = scores.mean()
+        print(f"    scores:", scores)
+        print(f"    R^2: {R2:.3}")
+
+    X_train, X_test, Y_train, Y_test = train_test_split(X_all_1_feature, Y_all, test_size=0.2, random_state=42)
+    estimator.fit(X_train, Y_train)
+    R2_test = estimator.score(X_test, Y_test)
+    print("R2 on test set:", R2_test)
+
+    x_fine = np.linspace(np.min(feature), np.max(feature), 2000)
+
+    plt.figure(figsize=(4, 4))
+    plt.scatter(feature, Y_all, color="r", s=2, alpha=0.1)
+    plt.plot(x_fine, estimator.predict(x_fine.reshape((-1, 1))), label=regressor_str)
+    plt.xlabel(feature_name)
+    plt.ylabel("Actual log(heat flux) from GX")
+    plt.legend(loc=0)
+
+    plt.tight_layout()
+    plt.show()
