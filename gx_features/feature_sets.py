@@ -39,6 +39,23 @@ from .utils import (
 n_logical_threads = psutil.cpu_count(logical=True)
 
 
+def check_for_NaNs(extracted_features):
+    """Check a DataFrame for any NaNs and report their locations."""
+    nan_locations = np.nonzero(np.isnan(extracted_features.to_numpy()))
+    if len(nan_locations[0]) > 0:
+        columns = extracted_features.columns
+        for j in range(len(nan_locations[0])):
+            print(
+                "NaN found at row",
+                nan_locations[0][j],
+                "and column",
+                nan_locations[1][j],
+                columns[nan_locations[1][j]],
+            )
+    else:
+        print("No NaNs found")
+
+
 def create_tensors_20240725_01(dataset):
     raw_tensor, raw_names, Y = load_tensor(dataset)
 
@@ -641,20 +658,7 @@ def create_features_20240804_01(n_data=None):
         "Number of features before dropping nearly constant features:",
         extracted_features.shape[1],
     )
-    # Check for any NaNs
-    nan_locations = np.nonzero(np.isnan(extracted_features.to_numpy()))
-    if len(nan_locations[0]) > 0:
-        columns = extracted_features.columns
-        for j in range(len(nan_locations[0])):
-            print(
-                "NaN found at row",
-                nan_locations[0][j],
-                "and column",
-                nan_locations[1][j],
-                columns[nan_locations[1][j]],
-            )
-    else:
-        print("No NaNs found")
+    check_for_NaNs(extracted_features)
 
     features = drop_nearly_constant_features(extracted_features)
 
@@ -706,7 +710,9 @@ def create_features_20240805_01(n_data=None):
     activation_functions = np.zeros(
         (n_data, n_z, n_thresholds * n_activation_functions)
     )
-    longest_true_interval_masks = compute_mask_for_longest_true_interval(gbdrift[:, :, None] - thresholds[None, None, :] > 0)
+    longest_true_interval_masks = compute_mask_for_longest_true_interval(
+        gbdrift[:, :, None] - thresholds[None, None, :] > 0
+    )
 
     activation_function_names = []
     for j_activation_function in range(n_activation_functions):
@@ -738,7 +744,9 @@ def create_features_20240805_01(n_data=None):
                 )
                 name = f"leakyHeaviside{alpha:.2f}_{threshold:.2f}"
             elif j_activation_function == 5:
-                activation_functions[:, :, index] = longest_true_interval_masks[:, :, j_threshold]
+                activation_functions[:, :, index] = longest_true_interval_masks[
+                    :, :, j_threshold
+                ]
                 name = f"longestGbdriftPosInterval{threshold:.2f}"
             else:
                 raise RuntimeError("Should not get here")
@@ -781,11 +789,13 @@ def create_features_20240805_01(n_data=None):
     )
     print("gbdrift_gds2_names:", gbdrift_gds2_names)
 
-    gbdrift_gds2_bmag_tensor, gbdrift_gds2_bmag_names = make_pairwise_products_from_2_sets(
-        gbdrift_gds2_tensor,
-        gbdrift_gds2_names,
-        powers_of_bmag_tensor,
-        powers_of_bmag_names,
+    gbdrift_gds2_bmag_tensor, gbdrift_gds2_bmag_names = (
+        make_pairwise_products_from_2_sets(
+            gbdrift_gds2_tensor,
+            gbdrift_gds2_names,
+            powers_of_bmag_tensor,
+            powers_of_bmag_names,
+        )
     )
 
     tensor, names = make_pairwise_products_from_2_sets(
@@ -951,20 +961,7 @@ def create_features_20240906_01(n_data=None):
         "Number of features before dropping nearly constant features:",
         extracted_features.shape[1],
     )
-    # Check for any NaNs
-    nan_locations = np.nonzero(np.isnan(extracted_features.to_numpy()))
-    if len(nan_locations[0]) > 0:
-        columns = extracted_features.columns
-        for j in range(len(nan_locations[0])):
-            print(
-                "NaN found at row",
-                nan_locations[0][j],
-                "and column",
-                nan_locations[1][j],
-                columns[nan_locations[1][j]],
-            )
-    else:
-        print("No NaNs found")
+    check_for_NaNs(extracted_features)
 
     features = drop_nearly_constant_features(extracted_features)
 
@@ -994,8 +991,9 @@ def create_features_20241011_01(n_data=None):
     raw_tensor = data["feature_tensor"]
     raw_names = data["z_functions"]
     Y = data["Y"]
-    raw_names = simplify_names(raw_names)
     extra_scalar_features = data["scalar_feature_matrix"]
+
+    raw_names = simplify_names(raw_names)
 
     if n_data is not None:
         raw_tensor = raw_tensor[:n_data, :, :]
@@ -1009,7 +1007,6 @@ def create_features_20241011_01(n_data=None):
     inverse_tensor, inverse_names = make_inverse_quantities(F, F_names)
     F, F_names = combine_tensors(F, F_names, inverse_tensor, inverse_names)
 
-    # CF, CF_names = make_feature_product_and_quotient_combinations(F, F_names)
     CF, CF_names = make_feature_product_combinations(F, F_names)
 
     M, M_names = heaviside_transformations(F, F_names)
@@ -1064,20 +1061,7 @@ def create_features_20241011_01(n_data=None):
         "Number of features before dropping nearly constant features:",
         extracted_features.shape[1],
     )
-    # Check for any NaNs
-    nan_locations = np.nonzero(np.isnan(extracted_features.to_numpy()))
-    if len(nan_locations[0]) > 0:
-        columns = extracted_features.columns
-        for j in range(len(nan_locations[0])):
-            print(
-                "NaN found at row",
-                nan_locations[0][j],
-                "and column",
-                nan_locations[1][j],
-                columns[nan_locations[1][j]],
-            )
-    else:
-        print("No NaNs found")
+    check_for_NaNs(extracted_features)
 
     ###########################################################################
     # Add extra scalar features
@@ -1101,8 +1085,7 @@ def create_features_20241011_01(n_data=None):
     features["Y"] = Y
     drop_special_characters_from_column_names(features)
 
-    filename = "20240601-01_features_20240906_01"
-
+    filename = "20241005-01_features_20241011_01"
     features.to_pickle(filename + ".pkl")
 
 
