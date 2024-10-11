@@ -34,6 +34,17 @@ def load_all(dataset):
             data_dir,
             "20240726-01-random_stellarator_equilibria_and_GX_gx_results_gradxRemoved.pkl",
         )
+    elif dataset == "20241005":
+        # File with the flux tube geometries (raw features):
+        in_filename = os.path.join(
+            data_dir,
+            "20241004-01-assembleFluxTubeTensor_multiNfp_finiteBeta_nz96.pkl",
+        )
+        # File with the GX heat flux
+        out_filename = os.path.join(
+            data_dir,
+            "20241004-01-random_stellarator_equilibria_GX_results_combined.pkl",
+        )
     else:
         raise ValueError(f"Unknown dataset: {dataset}")
 
@@ -49,33 +60,39 @@ def load_all(dataset):
 
     print("in.data.keys():", in_data.keys())
     n_z = in_data["nl"]
-    n_quantities = in_data["n_quantities"]
 
-    if dataset == "20240726":
-        feature_tensor = in_data["tensor"]
-    else:
+    if dataset in ["test", "20240601"]:
+        # These are old data that used "matrix" rather than "tensor"
+
         raw_feature_matrix = in_data["matrix"]
 
         # Divide up the features so each quantity is a 3rd dimension in a tensor
+        n_quantities = in_data["n_quantities"]
         feature_tensor = np.zeros((n_data, n_z, n_quantities))
         for j in range(n_quantities):
             index = j * n_z
             feature_tensor[:, :, j] = raw_feature_matrix[:, index : index + n_z]
+    else:
+        feature_tensor = in_data["tensor"]
 
     print("n_z:", n_z)
-    print("n_features:", in_data["n_features"])
-    print("n_quantities:", n_quantities)
     print("z_functions:", in_data["z_functions"])
     print("n_data:", n_data)
+    assert len(Y) == feature_tensor.shape[0]
 
     data = {
         "Y": Y,
         "feature_tensor": feature_tensor,
         "n_z": n_z,
         "n_data": n_data,
-        "n_quantities": n_quantities,
-        "z_functions": in_data["z_functions"],
     }
+    fields_to_copy_from_input = [
+        "z_functions", "scalars", "scalar_feature_matrix", "n_quantities",
+    ]
+    for f in fields_to_copy_from_input:
+        if f in in_data.keys():
+            data[f] = in_data[f]
+
     return data
 
 

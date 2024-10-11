@@ -10,7 +10,7 @@ from sklearn.feature_selection import RFE
 from tsfresh import extract_features
 import lightgbm as lgb
 
-from .io import load_tensor
+from .io import load_all, load_tensor
 from .calculations import (
     compute_mean_k_parallel,
     compute_max_minus_min,
@@ -965,6 +965,131 @@ def create_features_20240906_01(n_data=None):
             )
     else:
         print("No NaNs found")
+
+    features = drop_nearly_constant_features(extracted_features)
+
+    print("\n****** Final features ******\n")
+    for f in features.columns:
+        print(f)
+    print("Final number of features:", features.shape[1])
+
+    features["Y"] = Y
+    drop_special_characters_from_column_names(features)
+
+    filename = "20240601-01_features_20240906_01"
+
+    features.to_pickle(filename + ".pkl")
+
+
+def create_features_20241011_01(n_data=None):
+    """
+    Same as 20240804_01, but for finite-beta rather than vacuum, so cvdrift is
+    also included. Also, the scalar features [nfp, iota, shat, d_pressure_d_s]
+    are added.
+
+    If n_data is None, all data entries will be used.
+    If n_data is an integer, the data will be trimmed to the first n_data entries.
+    """
+    data = load_all("20241005")
+    raw_tensor = data["feature_tensor"]
+    raw_names = data["z_functions"]
+    Y = data["Y"]
+    raw_names = simplify_names(raw_names)
+    extra_scalar_features = data["scalar_feature_matrix"]
+
+    if n_data is not None:
+        raw_tensor = raw_tensor[:n_data, :, :]
+        Y = Y[:n_data]
+        extra_scalar_features = extra_scalar_features[:n_data, :]
+
+    # Add local shear as a feature:
+    F, F_names = add_local_shear(raw_tensor, raw_names, include_integral=False)
+
+    # Add inverse quantities:
+    inverse_tensor, inverse_names = make_inverse_quantities(F, F_names)
+    F, F_names = combine_tensors(F, F_names, inverse_tensor, inverse_names)
+
+    # CF, CF_names = make_feature_product_and_quotient_combinations(F, F_names)
+    CF, CF_names = make_feature_product_combinations(F, F_names)
+
+    M, M_names = heaviside_transformations(F, F_names)
+    print("M_names:", M_names)
+
+    MF, MF_names = make_pairwise_products_from_2_sets(F, F_names, M, M_names)
+    MCF, MCF_names = make_pairwise_products_from_2_sets(CF, CF_names, M, M_names)
+
+    tensor_before_inv_bmag, names_before_inv_bmag = combine_tensors(
+        F, F_names, MF, MF_names, CF, CF_names, MCF, MCF_names
+    )
+
+    tensor_after_inv_bmag, names_after_inv_bmag = divide_by_quantity(
+        tensor_before_inv_bmag, names_before_inv_bmag, raw_tensor[:, :, 0], "bmag"
+    )
+
+    tensor, names = combine_tensors(
+        tensor_before_inv_bmag,
+        names_before_inv_bmag,
+        tensor_after_inv_bmag,
+        names_after_inv_bmag,
+    )
+
+    print("\nQuantities before reduction:\n")
+    for n in names:
+        print(n)
+    print("\nNumber of quantities before reduction:", len(names))
+
+    ###########################################################################
+    # Now apply reductions.
+    ###########################################################################
+
+    extracted_features = compute_reductions(
+        tensor,
+        names,
+        max=True,
+        min=True,
+        max_minus_min=True,
+        mean=True,
+        median=True,
+        rms=True,
+        variance=True,
+        skewness=True,
+        quantiles=[0.1, 0.2, 0.3, 0.4, 0.6, 0.7, 0.8, 0.9],
+        count_above=np.arange(-2, 6.1, 0.5),
+        fft_coefficients=[1, 2, 3],
+        mean_kpar=True,
+        argmax_kpar=True,
+    )
+
+    print(
+        "Number of features before dropping nearly constant features:",
+        extracted_features.shape[1],
+    )
+    # Check for any NaNs
+    nan_locations = np.nonzero(np.isnan(extracted_features.to_numpy()))
+    if len(nan_locations[0]) > 0:
+        columns = extracted_features.columns
+        for j in range(len(nan_locations[0])):
+            print(
+                "NaN found at row",
+                nan_locations[0][j],
+                "and column",
+                nan_locations[1][j],
+                columns[nan_locations[1][j]],
+            )
+    else:
+        print("No NaNs found")
+
+    ###########################################################################
+    # Add extra scalar features
+    ###########################################################################
+
+    extra_scalar_features_df = DataFrame(extra_scalar_features, columns=data["scalars"])
+
+    extracted_features = extracted_features.join(extra_scalar_features_df)
+
+    ###########################################################################
+    # Finishing touches
+    ###########################################################################
 
     features = drop_nearly_constant_features(extracted_features)
 
