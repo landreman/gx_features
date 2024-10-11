@@ -450,6 +450,24 @@ def plot_correlation_with_SFS_feature_1(features_filename, SFS_filename):
     plt.tight_layout()
     plt.show()
 
+def _regressor_str_to_regressor(regressor_str):
+    if regressor_str == "xgb":
+        regressor = XGBRegressor()
+    elif regressor_str == "xgb linear":
+        regressor = XGBRegressor(booster="gblinear")
+    elif regressor_str == "lgbm":
+        regressor = LGBMRegressor()
+    elif regressor_str == "lgbm linear":
+        regressor = LGBMRegressor(linear_tree=True)
+    elif regressor_str == "knn":
+        regressor = KNeighborsRegressor(10)
+    elif regressor_str == "knn distance":
+        regressor = KNeighborsRegressor(n_neighbors=10, weights="distance")
+    else:
+        regressor = regressor_str
+
+    return regressor
+
 def plot_correlation_with_SFS_feature_1_and_model(features_filename, SFS_filename, regressor, check_R2=False):
     data = read_pickle(features_filename)
     Y_all = data["Y"]
@@ -470,16 +488,7 @@ def plot_correlation_with_SFS_feature_1_and_model(features_filename, SFS_filenam
     X_all_1_feature = feature.to_numpy().reshape((-1, 1))
 
     regressor_str = str(regressor)
-    if regressor == "xgb":
-        regressor = XGBRegressor()
-    elif regressor == "lgbm":
-        regressor = LGBMRegressor()
-    elif regressor == "lgbm linear":
-        regressor = LGBMRegressor(linear_tree=True)
-    elif regressor == "knn":
-        regressor = KNeighborsRegressor(10)
-    elif regressor == "knn distance":
-        regressor = KNeighborsRegressor(n_neighbors=10, weights="distance")
+    regressor = _regressor_str_to_regressor(regressor)
 
     estimator = make_pipeline(
         StandardScaler(),
@@ -507,6 +516,73 @@ def plot_correlation_with_SFS_feature_1_and_model(features_filename, SFS_filenam
     plt.xlabel(feature_name)
     plt.ylabel("Actual log(heat flux) from GX")
     plt.legend(loc=0)
+
+    plt.tight_layout()
+    plt.show()
+    
+def plot_model_with_top_2_SFS_features(features_filename, SFS_filename, regressor, check_R2=False):
+    data = read_pickle(features_filename)
+    Y_all = data["Y"]
+    X_all = data.drop(columns="Y")
+
+    with open(SFS_filename, "rb") as file:
+        sfs = pickle.load(file)
+
+    n_features = 2
+    print("Features retained:", sfs.subsets_[n_features])
+    temp = sfs.subsets_[n_features]['feature_idx']
+    np.testing.assert_array_equal(temp, sorted(temp))
+    feature_names = sfs.subsets_[n_features]['feature_names']
+    column_selector = ColumnSelector(cols=sfs.subsets_[n_features]['feature_idx'])
+    X_all_2_features = column_selector.fit_transform(X_all)
+    print(X_all_2_features)
+
+    regressor_str = str(regressor)
+    regressor = _regressor_str_to_regressor(regressor)
+
+    estimator = make_pipeline(
+        StandardScaler(),
+        regressor,
+    )
+    if check_R2:
+        folds = KFold(n_splits=5, shuffle=True, random_state=42)
+        scores = cross_val_score(
+            estimator, X_all_2_features, Y_all, cv=folds, scoring="r2", verbose=2
+        )
+        R2 = scores.mean()
+        print(f"    scores:", scores)
+        print(f"    R^2: {R2:.3}")
+
+    X_train, X_test, Y_train, Y_test = train_test_split(X_all_2_features, Y_all, test_size=0.2, random_state=42)
+    estimator.fit(X_train, Y_train)
+    R2_test = estimator.score(X_test, Y_test)
+    print("R2 on test set:", R2_test)
+
+    x_min = np.min(X_all_2_features, axis=0)
+    x_max = np.max(X_all_2_features, axis=0)
+    x0_1d = np.linspace(x_min[0], x_max[0], 100)
+    x1_1d = np.linspace(x_min[1], x_max[1], 101)
+    x0, x1 = np.meshgrid(x0_1d, x1_1d)
+
+    X_fine = np.stack((x0.flatten(), x1.flatten()), axis=-1)
+    print("X_fine.shape:", X_fine.shape)
+    Y_fine = estimator.predict(X_fine)
+
+    Y_fine = Y_fine.reshape(x0.shape)
+
+    plt.figure(figsize=(4.5, 4))
+    flip = True
+    if flip:
+        plt.contourf(x1_1d, x0_1d, Y_fine.T, 25)
+        plt.xlabel(feature_names[1])
+        plt.ylabel(feature_names[0])
+    else:
+        plt.contourf(x0_1d, x1_1d, Y_fine, 25)
+        plt.xlabel(feature_names[0])
+        plt.ylabel(feature_names[1])
+        
+    plt.colorbar()
+    plt.title("Predicted ln(Q) using " + regressor_str)
 
     plt.tight_layout()
     plt.show()
