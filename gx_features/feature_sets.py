@@ -1074,6 +1074,7 @@ def create_features_20241011_01(n_data=None):
         mean_kpar=True,
         argmax_kpar=True,
     )
+    del tensor  # Free up memory
 
     print(
         time.time() - start_time,

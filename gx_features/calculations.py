@@ -41,6 +41,7 @@ def compute_mean_k_parallel(data, names, include_argmax=False):
     k_parallel = np.arange(1, max_index)
 
     data_hat_abs = np.abs(data_hat)
+    del data_hat  # Free up memory
     mean_k_parallel = np.sum(k_parallel[None, :, None] * data_hat_abs, axis=1) / np.sum(
         data_hat_abs, axis=1
     )
@@ -316,8 +317,7 @@ def compute_reductions(
         print("Done with count_above calculation")
 
     if fft_coefficients is not None:
-        fft_result = np.fft.fft(tensor, axis=1)
-        abs_fft_result = np.abs(fft_result)
+        abs_fft_result = np.abs(np.fft.fft(tensor, axis=1))
         for j in fft_coefficients:
             features[:, index : index + n_quantities] = abs_fft_result[:, j, :]
             new_names += [n + f"_absFftCoeff{j}" for n in names]
