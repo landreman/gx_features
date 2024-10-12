@@ -1013,6 +1013,7 @@ def create_features_20241011_01(n_data=None):
     inverse_tensor, inverse_names = make_inverse_quantities(F, F_names)
     print(time.time() - start_time, "Done creating inverse quantities", flush=True)
     F, F_names = combine_tensors(F, F_names, inverse_tensor, inverse_names)
+    del inverse_tensor  # Free up memory
     print(time.time() - start_time, "Done combining inverse quantities with original raw features", flush=True)
 
     CF, CF_names = make_feature_product_combinations(F, F_names)
@@ -1030,6 +1031,7 @@ def create_features_20241011_01(n_data=None):
     tensor_before_inv_bmag, names_before_inv_bmag = combine_tensors(
         F, F_names, MF, MF_names, CF, CF_names, MCF, MCF_names
     )
+    del F, MF, CF, MCF  # Free up memory
     print(time.time() - start_time, "Done combining tensors before dividing by bmag", flush=True)
 
     tensor_after_inv_bmag, names_after_inv_bmag = divide_by_quantity(
@@ -1043,6 +1045,7 @@ def create_features_20241011_01(n_data=None):
         tensor_after_inv_bmag,
         names_after_inv_bmag,
     )
+    del tensor_before_inv_bmag, tensor_after_inv_bmag  # Free up memory
     print(time.time() - start_time, "Done combining tensors with and without 1/B", flush=True)
 
     print(time.time() - start_time, "\nQuantities before reduction:\n")
