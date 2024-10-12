@@ -309,9 +309,8 @@ def compute_reductions(
 
     if skewness:
         gc.collect(); gc.collect(); gc.collect()
-        skew_data = skew(tensor, axis=1, bias=False)
         # If any of the quantities are constant, skewness will be NaN.
-        features[:, index : index + n_quantities] = np.nan_to_num(skew_data)
+        features[:, index : index + n_quantities] = np.nan_to_num(skew(tensor, axis=1, bias=False))
         new_names += [n + "_skewness" for n in names]
         index += n_quantities
         print("Done with skewness calculation", flush=True)
@@ -323,6 +322,7 @@ def compute_reductions(
             features[:, index : index + n_quantities] = quantiles_result[j_quantile, :]
             new_names += [n + f"_quantile{q}" for n in names]
             index += n_quantities
+        del quantiles_result  # Free up memory
         print("Done with quantiles calculation", flush=True)
 
     if count_above is not None:
