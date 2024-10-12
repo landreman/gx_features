@@ -978,7 +978,7 @@ def create_features_20240906_01(n_data=None):
     features.to_pickle(filename + ".pkl")
 
 
-def create_features_20241011_01(n_data=None):
+def create_features_20241011_01(n_data=None, mpi=False):
     """
     Same as 20240804_01, but for finite-beta rather than vacuum, so cvdrift is
     also included. Also, the scalar features [nfp, iota, shat, d_pressure_d_s]
@@ -1000,6 +1000,15 @@ def create_features_20241011_01(n_data=None):
         Y = Y[:n_data]
         extra_scalar_features = extra_scalar_features[:n_data, :]
 
+    if mpi:
+        from .utils import proc0_print
+        raw_tensor, extra_scalar_features = distribute_work_mpi(raw_tensor, extra_scalar_features)
+        from mpi4py import MPI
+        proc0 = (MPI.COMM_WORLD.rank == 0)
+    else:
+        proc0_print = print
+        proc0 = True
+
     # Add local shear as a feature:
     F, F_names = add_local_shear(raw_tensor, raw_names, include_integral=False)
 
@@ -1010,7 +1019,7 @@ def create_features_20241011_01(n_data=None):
     CF, CF_names = make_feature_product_combinations(F, F_names)
 
     M, M_names = heaviside_transformations(F, F_names)
-    print("M_names:", M_names)
+    proc0_print("M_names:", M_names)
 
     MF, MF_names = make_pairwise_products_from_2_sets(F, F_names, M, M_names)
     MCF, MCF_names = make_pairwise_products_from_2_sets(CF, CF_names, M, M_names)
@@ -1030,10 +1039,10 @@ def create_features_20241011_01(n_data=None):
         names_after_inv_bmag,
     )
 
-    print("\nQuantities before reduction:\n")
+    proc0_print("\nQuantities before reduction:\n")
     for n in names:
         print(n)
-    print("\nNumber of quantities before reduction:", len(names))
+    proc0_print("\nNumber of quantities before reduction:", len(names))
 
     ###########################################################################
     # Now apply reductions.
@@ -1057,7 +1066,7 @@ def create_features_20241011_01(n_data=None):
         argmax_kpar=True,
     )
 
-    print(
+    proc0_print(
         "Number of features before dropping nearly constant features:",
         extracted_features.shape[1],
     )
@@ -1075,18 +1084,22 @@ def create_features_20241011_01(n_data=None):
     # Finishing touches
     ###########################################################################
 
-    features = drop_nearly_constant_features(extracted_features)
+    if mpi:
+        mpi_join_dataframes(extracted_features)
 
-    print("\n****** Final features ******\n")
-    for f in features.columns:
-        print(f)
-    print("Final number of features:", features.shape[1])
+    if proc0:
+        features = drop_nearly_constant_features(extracted_features)
 
-    features["Y"] = Y
-    drop_special_characters_from_column_names(features)
+        proc0_print("\n****** Final features ******\n")
+        for f in features.columns:
+            proc0_print(f)
+        proc0_print("Final number of features:", features.shape[1])
 
-    filename = "20241005-01_features_20241011_01"
-    features.to_pickle(filename + ".pkl")
+        features["Y"] = Y
+        drop_special_characters_from_column_names(features)
+
+        filename = "20241005-01_features_20241011_01"
+        features.to_pickle(filename + ".pkl")
 
 
 def create_test_features():

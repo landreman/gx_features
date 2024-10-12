@@ -40,3 +40,4 @@ class Tests(unittest.TestCase):
 
     def test_create_features_20241011_01(self):
         create_features_20241011_01(10)
+        create_features_20241011_01(10, mpi=True)
