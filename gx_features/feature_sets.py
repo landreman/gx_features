@@ -2,6 +2,7 @@ import os
 import pickle
 import psutil
 import time
+import gc
 import numpy as np
 from pandas import DataFrame, read_pickle
 import matplotlib.pyplot as plt
@@ -1057,6 +1058,7 @@ def create_features_20241011_01(n_data=None):
     # Now apply reductions.
     ###########################################################################
 
+    gc.collect(); gc.collect(); gc.collect()
     extracted_features = compute_reductions(
         tensor,
         names,
