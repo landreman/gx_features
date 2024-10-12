@@ -1,6 +1,7 @@
 import os
 import pickle
 import psutil
+import time
 import numpy as np
 from pandas import DataFrame, read_pickle
 import matplotlib.pyplot as plt
@@ -9,6 +10,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.feature_selection import RFE
 from tsfresh import extract_features
 import lightgbm as lgb
+from memory_profiler import profile
 
 from .io import load_all, load_tensor
 from .calculations import (
@@ -977,7 +979,7 @@ def create_features_20240906_01(n_data=None):
 
     features.to_pickle(filename + ".pkl")
 
-
+@profile
 def create_features_20241011_01(n_data=None):
     """
     Same as 20240804_01, but for finite-beta rather than vacuum, so cvdrift is
@@ -987,13 +989,16 @@ def create_features_20241011_01(n_data=None):
     If n_data is None, all data entries will be used.
     If n_data is an integer, the data will be trimmed to the first n_data entries.
     """
+    start_time = time.time()
     data = load_all("20241005")
+    print(time.time() - start_time, "Done loading data", flush=True)
     raw_tensor = data["feature_tensor"]
     raw_names = data["z_functions"]
     Y = data["Y"]
     extra_scalar_features = data["scalar_feature_matrix"]
 
     raw_names = simplify_names(raw_names)
+    print(time.time() - start_time, "Done simplifying names", flush=True)
 
     if n_data is not None:
         raw_tensor = raw_tensor[:n_data, :, :]
@@ -1002,26 +1007,35 @@ def create_features_20241011_01(n_data=None):
 
     # Add local shear as a feature:
     F, F_names = add_local_shear(raw_tensor, raw_names, include_integral=False)
+    print(time.time() - start_time, "Done adding local shear", flush=True)
 
     # Add inverse quantities:
     inverse_tensor, inverse_names = make_inverse_quantities(F, F_names)
+    print(time.time() - start_time, "Done creating inverse quantities", flush=True)
     F, F_names = combine_tensors(F, F_names, inverse_tensor, inverse_names)
+    print(time.time() - start_time, "Done combining inverse quantities with original raw features", flush=True)
 
     CF, CF_names = make_feature_product_combinations(F, F_names)
+    print(time.time() - start_time, "Done forming feature product combinations", flush=True)
 
     M, M_names = heaviside_transformations(F, F_names)
-    print("M_names:", M_names)
+    print(time.time() - start_time, "Done creating Heaviside transformations", flush=True)
+    print("M_names:", M_names, flush=True)
 
     MF, MF_names = make_pairwise_products_from_2_sets(F, F_names, M, M_names)
+    print(time.time() - start_time, "Done creating MF features", flush=True)
     MCF, MCF_names = make_pairwise_products_from_2_sets(CF, CF_names, M, M_names)
+    print(time.time() - start_time, "Done creating MCF features", flush=True)
 
     tensor_before_inv_bmag, names_before_inv_bmag = combine_tensors(
         F, F_names, MF, MF_names, CF, CF_names, MCF, MCF_names
     )
+    print(time.time() - start_time, "Done combining tensors before dividing by bmag", flush=True)
 
     tensor_after_inv_bmag, names_after_inv_bmag = divide_by_quantity(
         tensor_before_inv_bmag, names_before_inv_bmag, raw_tensor[:, :, 0], "bmag"
     )
+    print(time.time() - start_time, "Done dividing by bmag", flush=True)
 
     tensor, names = combine_tensors(
         tensor_before_inv_bmag,
@@ -1029,11 +1043,12 @@ def create_features_20241011_01(n_data=None):
         tensor_after_inv_bmag,
         names_after_inv_bmag,
     )
+    print(time.time() - start_time, "Done combining tensors with and without 1/B", flush=True)
 
-    print("\nQuantities before reduction:\n")
+    print(time.time() - start_time, "\nQuantities before reduction:\n")
     for n in names:
         print(n)
-    print("\nNumber of quantities before reduction:", len(names))
+    print("\nNumber of quantities before reduction:", len(names), flush=True)
 
     ###########################################################################
     # Now apply reductions.
@@ -1058,8 +1073,10 @@ def create_features_20241011_01(n_data=None):
     )
 
     print(
+        time.time() - start_time,
         "Number of features before dropping nearly constant features:",
         extracted_features.shape[1],
+        flush=True
     )
     check_for_NaNs(extracted_features)
 

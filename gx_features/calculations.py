@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.stats import skew
 import pandas as pd
+from memory_profiler import profile
 
 
 def differentiate(data):
@@ -196,7 +197,7 @@ def compute_max_minus_min(data, names):
 
     return features, new_names
 
-
+@profile
 def compute_reductions(
     tensor,
     names,
