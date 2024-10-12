@@ -322,6 +322,7 @@ def compute_reductions(
             features[:, index : index + n_quantities] = abs_fft_result[:, j, :]
             new_names += [n + f"_absFftCoeff{j}" for n in names]
             index += n_quantities
+        del abs_fft_result  # Free up memory
         print("Done with fft_coefficients calculation")
 
     if mean_kpar or argmax_kpar:
