@@ -26,5 +26,5 @@ cd tests
 
 for j in {1..3}
 do
-    mpiexec -n $j python -m unittest -k mpi
+    mpiexec --oversubscribe -n $j python -m unittest -k mpi
 done
