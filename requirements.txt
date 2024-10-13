@@ -6,6 +6,7 @@ scikit-learn
 tsfresh
 xgboost
 lightgbm
+feature_engine
 mlxtend
 shap
 memory_profiler
