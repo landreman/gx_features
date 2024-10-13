@@ -38,6 +38,13 @@ class Tests(unittest.TestCase):
     def test_create_features_20240906_01(self):
         create_features_20240906_01(10)
 
-    def test_create_features_20241011_01(self):
-        create_features_20241011_01(10)
-        create_features_20241011_01(10, mpi=True)
+    def test_create_features_20241011_01_mpi(self):
+        df_mpi = create_features_20241011_01(10, mpi=True)
+        df_no_mpi = create_features_20241011_01(10)
+
+        from mpi4py import MPI
+        comm = MPI.COMM_WORLD
+        rank = comm.Get_rank()
+        if rank == 0:
+            assert list(df_no_mpi.columns) == list(df_mpi.columns)
+            np.testing.assert_allclose(df_no_mpi.to_numpy(), df_mpi.to_numpy())

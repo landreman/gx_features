@@ -32,6 +32,7 @@ from .combinations import (
     heaviside_transformations,
     divide_by_quantity,
 )
+from .mpi import distribute_work_mpi, join_dataframes_mpi
 from .utils import (
     tensor_to_tsfresh_dataframe,
     drop_nearly_constant_features,
@@ -41,6 +42,10 @@ from .utils import (
 
 n_logical_threads = psutil.cpu_count(logical=True)
 
+
+def run_gc():
+    # gc.collect(); gc.collect(); gc.collect()
+    pass
 
 def check_for_NaNs(extracted_features):
     """Check a DataFrame for any NaNs and report their locations."""
@@ -980,7 +985,7 @@ def create_features_20240906_01(n_data=None):
 
     features.to_pickle(filename + ".pkl")
 
-@profile
+# @profile
 def create_features_20241011_01(n_data=None, mpi=False):
     """
     Same as 20240804_01, but for finite-beta rather than vacuum, so cvdrift is
@@ -1007,7 +1012,7 @@ def create_features_20241011_01(n_data=None, mpi=False):
         extra_scalar_features = extra_scalar_features[:n_data, :]
 
     if mpi:
-        from .utils import proc0_print
+        from .mpi import proc0_print
         raw_tensor, extra_scalar_features = distribute_work_mpi(raw_tensor, extra_scalar_features)
         from mpi4py import MPI
         proc0 = (MPI.COMM_WORLD.rank == 0)
@@ -1067,7 +1072,7 @@ def create_features_20241011_01(n_data=None, mpi=False):
     # Now apply reductions.
     ###########################################################################
 
-    gc.collect(); gc.collect(); gc.collect()
+    run_gc()
     extracted_features = compute_reductions(
         tensor,
         names,
@@ -1108,7 +1113,7 @@ def create_features_20241011_01(n_data=None, mpi=False):
     ###########################################################################
 
     if mpi:
-        mpi_join_dataframes(extracted_features)
+        extracted_features = join_dataframes_mpi(extracted_features)
 
     if proc0:
         features = drop_nearly_constant_features(extracted_features)
@@ -1123,6 +1128,8 @@ def create_features_20241011_01(n_data=None, mpi=False):
 
         filename = "20241005-01_features_20241011_01"
         features.to_pickle(filename + ".pkl")
+
+        return features
 
 
 def create_test_features():

@@ -5,6 +5,10 @@ import pandas as pd
 from memory_profiler import profile
 
 
+def run_gc():
+    # gc.collect(); gc.collect(); gc.collect()
+    pass
+
 def differentiate(data):
     """Apply d/dz to the data, assuming periodic boundary conditions.
 
@@ -201,7 +205,7 @@ def compute_max_minus_min(data, names):
 
     return features, new_names
 
-@profile
+# @profile
 def compute_reductions(
     tensor,
     names,
@@ -257,21 +261,21 @@ def compute_reductions(
     new_names = []
 
     if max:
-        gc.collect(); gc.collect(); gc.collect()
+        run_gc()
         features[:, index : index + n_quantities] = np.max(tensor, axis=1)
         new_names += [n + "_max" for n in names]
         index += n_quantities
         print("Done with max calculation", flush=True)
 
     if min:
-        gc.collect(); gc.collect(); gc.collect()
+        run_gc()
         features[:, index : index + n_quantities] = np.min(tensor, axis=1)
         new_names += [n + "_min" for n in names]
         index += n_quantities
         print("Done with min calculation", flush=True)
 
     if max_minus_min:
-        gc.collect(); gc.collect(); gc.collect()
+        run_gc()
         features[:, index : index + n_quantities] = np.max(tensor, axis=1) - np.min(
             tensor, axis=1
         )
@@ -280,35 +284,35 @@ def compute_reductions(
         print("Done with max_minus_min calculation", flush=True)
 
     if mean:
-        gc.collect(); gc.collect(); gc.collect()
+        run_gc()
         features[:, index : index + n_quantities] = np.mean(tensor, axis=1)
         new_names += [n + "_mean" for n in names]
         index += n_quantities
         print("Done with mean calculation", flush=True)
 
     if median:
-        gc.collect(); gc.collect(); gc.collect()
+        run_gc()
         features[:, index : index + n_quantities] = np.median(tensor, axis=1)
         new_names += [n + "_median" for n in names]
         index += n_quantities
         print("Done with median calculation", flush=True)
 
     if rms:
-        gc.collect(); gc.collect(); gc.collect()
+        run_gc()
         features[:, index : index + n_quantities] = np.sqrt(np.mean(tensor**2, axis=1))
         new_names += [n + "_rms" for n in names]
         index += n_quantities
         print("Done with RMS calculation", flush=True)
 
     if variance:
-        gc.collect(); gc.collect(); gc.collect()
+        run_gc()
         features[:, index : index + n_quantities] = np.var(tensor, axis=1)
         new_names += [n + "_variance" for n in names]
         index += n_quantities
         print("Done with variance calculation", flush=True)
 
     if skewness:
-        gc.collect(); gc.collect(); gc.collect()
+        run_gc()
         # If any of the quantities are constant, skewness will be NaN.
         features[:, index : index + n_quantities] = np.nan_to_num(skew(tensor, axis=1, bias=False))
         new_names += [n + "_skewness" for n in names]
@@ -316,7 +320,7 @@ def compute_reductions(
         print("Done with skewness calculation", flush=True)
 
     if quantiles is not None:
-        gc.collect(); gc.collect(); gc.collect()
+        run_gc()
         quantiles_result = np.quantile(tensor, quantiles, axis=1)
         for j_quantile, q in enumerate(quantiles):
             features[:, index : index + n_quantities] = quantiles_result[j_quantile, :]
@@ -327,14 +331,14 @@ def compute_reductions(
 
     if count_above is not None:
         for t in count_above:
-            gc.collect(); gc.collect(); gc.collect()
+            run_gc()
             features[:, index : index + n_quantities] = np.mean(tensor > t, axis=1)
             new_names += [n + f"_countAbove{t}" for n in names]
             index += n_quantities
         print("Done with count_above calculation", flush=True)
 
     if fft_coefficients is not None:
-        gc.collect(); gc.collect(); gc.collect()
+        run_gc()
         abs_fft_result = np.abs(np.fft.fft(tensor, axis=1))
         for j in fft_coefficients:
             features[:, index : index + n_quantities] = abs_fft_result[:, j, :]
@@ -344,7 +348,7 @@ def compute_reductions(
         print("Done with fft_coefficients calculation", flush=True)
 
     if mean_kpar or argmax_kpar:
-        gc.collect(); gc.collect(); gc.collect()
+        run_gc()
         new_features, kpar_names = compute_mean_k_parallel(
             tensor, names, include_argmax=True
         )
@@ -362,7 +366,7 @@ def compute_reductions(
 
     assert len(new_names) == features.shape[1]
     assert index == n_features_total
-    gc.collect(); gc.collect(); gc.collect()
+    run_gc()
     print("About to form DataFrame in compute_reductions", flush=True)
     df = pd.DataFrame(features, columns=new_names)
     print("Done with compute_reductions", flush=True)

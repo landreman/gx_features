@@ -10,3 +10,4 @@ feature_engine
 mlxtend
 shap
 memory_profiler
+mpi4py

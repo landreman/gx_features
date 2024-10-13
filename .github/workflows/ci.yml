@@ -42,3 +42,7 @@ jobs:
         cd tests
         python -m unittest
 
+    - name: Run MPI tests
+      run: ./run_tests_mpi
+  
+  
