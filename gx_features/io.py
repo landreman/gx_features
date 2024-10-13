@@ -2,12 +2,17 @@ import pickle
 import os
 import numpy as np
 
+from .utils import in_github_actions
+
 
 def load_all(dataset):
     this_dir = os.path.dirname(os.path.abspath(__file__))
     test_file_dir = os.path.join(this_dir, "..", "tests", "files")
     data_dir = "/Users/mattland/Box/work24"
     # data_dir = "."
+    if in_github_actions:
+        data_dir = test_file_dir
+
     if dataset == "test":
         # File with the flux tube geometries (raw features):
         in_filename = os.path.join(test_file_dir, "test_data_in.pkl")
@@ -148,3 +153,105 @@ def create_test_data(n=10):
 
     with open(test_out_filename, "wb") as f:
         pickle.dump(out_data, f)
+
+
+def create_test_data2():
+    """Create small datasets for testing, by taking the first n rows of the data."""
+
+    for dataset in ["20240601", "20240726", "20241005"]:
+        print("\n\nProcessing dataset", dataset)
+
+        data_dir = "/Users/mattland/Box/work24"
+        if dataset == "20240601":
+            # File with the flux tube geometries (raw features):
+            in_filename = os.path.join(
+                data_dir,
+                "20240601-01-assembleFluxTubeMatrix_noShiftScale_nz96_withCvdrift.pkl",
+            )
+            # File with the GX heat flux
+            out_filename = os.path.join(
+                data_dir, "20240601-01-103_gx_nfp4_production_gx_results_gradxRemoved.pkl"
+            )
+            n = 20
+        elif dataset == "20240726":
+            # File with the flux tube geometries (raw features):
+            in_filename = os.path.join(
+                data_dir,
+                "20240726-01-assembleFluxTubeTensor_vacuum_nz96.pkl",
+            )
+            # File with the GX heat flux
+            out_filename = os.path.join(
+                data_dir,
+                "20240726-01-random_stellarator_equilibria_and_GX_gx_results_gradxRemoved.pkl",
+            )
+            n = 31
+        elif dataset == "20241005":
+            # File with the flux tube geometries (raw features):
+            in_filename = os.path.join(
+                data_dir,
+                "20241004-01-assembleFluxTubeTensor_multiNfp_finiteBeta_nz96.pkl",
+            )
+            # File with the GX heat flux
+            out_filename = os.path.join(
+                data_dir,
+                "20241004-01-random_stellarator_equilibria_GX_results_combined.pkl",
+            )
+            n = 43
+        else:
+            raise ValueError(f"Unknown dataset: {dataset}")
+
+        with open(in_filename, "rb") as f:
+            in_data = pickle.load(f)
+
+        with open(out_filename, "rb") as f:
+            out_data = pickle.load(f)
+
+        old_n = len(in_data["tube_files"])
+        print("in_data.keys():", in_data.keys())
+        for key, val in in_data.items():
+            if isinstance(val, list):
+                print(key, "list:", len(val))
+                if len(val) == old_n:
+                    in_data[key] = val[:n]
+                    print("  trimmed to:", len(in_data[key]))
+            elif isinstance(val, np.ndarray):
+                print(key, "shape:", val.shape)
+                in_data[key] = val[:n]
+                print("  trimmed to:", in_data[key].shape)
+            else:
+                print(key, "scalar:")
+        print("out_data.keys():", out_data.keys())
+        for key, val in out_data.items():
+            if isinstance(val, list):
+                print(key, "list:", len(val))
+                if len(val) == old_n:
+                    out_data[key] = val[:n]
+                    print("  trimmed to:", len(out_data[key]))
+            elif isinstance(val, np.ndarray):
+                print(key, "shape:", val.shape)
+                out_data[key] = val[:n]
+                print("  trimmed to:", out_data[key].shape)
+            else:
+                print(key, "scalar:")
+
+        # in_data["matrix"] = in_data["matrix"][:n, :]
+        in_data["n_tubes"] = n
+        # in_data["tube_files"] = in_data["tube_files"][:n]
+
+        # out_data["tube_names"] = out_data["tube_names"][:n]
+        # out_data["VPrimes"] = out_data["VPrimes"][:n]
+        # out_data["FSA_grad_xs"] = out_data["FSA_grad_xs"][:n]
+        # out_data["Q_avgs_with_FSA_grad_x"] = out_data["Q_avgs_with_FSA_grad_x"][:n]
+        # out_data["Q_avgs_without_FSA_grad_x"] = out_data["Q_avgs_without_FSA_grad_x"][:n]
+
+        this_dir = os.path.dirname(os.path.abspath(__file__))
+        test_file_dir = os.path.join(this_dir, "..", "tests", "files")
+        test_in_filename = os.path.join(test_file_dir, os.path.basename(in_filename)[:-4] + f"_rows{n}.pkl")
+        test_out_filename = os.path.join(test_file_dir, os.path.basename(out_filename)[:-4] + f"_rows{n}.pkl")
+        print("Saving trimmed input file:", test_in_filename)
+        print("Saving trimmed output file:", test_out_filename)
+        with open(test_in_filename, "wb") as f:
+            pickle.dump(in_data, f)
+
+        with open(test_out_filename, "wb") as f:
+            pickle.dump(out_data, f)
