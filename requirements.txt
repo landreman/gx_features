@@ -1,0 +1,11 @@
+numpy
+scipy
+matplotlib
+pandas
+scikit-learn
+tsfresh
+xgboost
+lightgbm
+mlxtend
+shap
+memory_profiler
