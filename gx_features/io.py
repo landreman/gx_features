@@ -2,8 +2,9 @@ import pickle
 import os
 import numpy as np
 
-from .utils import in_github_actions
 
+"""Boolean indicating if we are in the GitHub actions CI"""
+in_github_actions = "CI" in os.environ and os.environ['CI'].lower() in ['1', 'true']
 
 def load_all(dataset):
     this_dir = os.path.dirname(os.path.abspath(__file__))
