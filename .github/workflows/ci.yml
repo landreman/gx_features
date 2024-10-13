@@ -10,9 +10,15 @@ jobs:
       fail-fast: false
       matrix:
         # As of 2024-10-13, tsfresh is not compatible with Python 3.12
-        python-version: [3.9, "3.11"]
+        python-version: [3.9, "3.10", "3.11"]
 
     steps:
+
+    - name: apt-get stuff needed for mpi
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential gfortran openmpi-bin libopenmpi-dev
+
     - uses: actions/checkout@v4
 
     - name: pwd
