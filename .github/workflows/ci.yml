@@ -1,0 +1,44 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # As of 2024-10-13, tsfresh is not compatible with Python 3.12
+        python-version: [3.9, "3.11"]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: pwd
+      run: pwd
+
+    - name: ls
+      run: ls -l
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: which pip after python setup
+      run: |
+        python -m pip install --upgrade pip
+        pip --version
+
+    - name: Install dependencies
+      run: pip install -r requirements.txt
+  
+    - name: Install package
+      run: pip install -v -e .
+
+    - name: Run tests
+      run: |
+        cd tests
+        python -m unittest
+
