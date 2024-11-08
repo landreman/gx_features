@@ -9,6 +9,7 @@ def run_gc():
     # gc.collect(); gc.collect(); gc.collect()
     pass
 
+
 def differentiate(data):
     """Apply d/dz to the data, assuming periodic boundary conditions.
 
@@ -205,6 +206,7 @@ def compute_max_minus_min(data, names):
 
     return features, new_names
 
+
 # @profile
 def compute_reductions(
     tensor,
@@ -222,6 +224,7 @@ def compute_reductions(
     fft_coefficients=None,
     mean_kpar=False,
     argmax_kpar=False,
+    return_df=True,
 ):
     print("Beginning compute_reductions")
     n_data, n_z, n_quantities = tensor.shape
@@ -314,7 +317,9 @@ def compute_reductions(
     if skewness:
         run_gc()
         # If any of the quantities are constant, skewness will be NaN.
-        features[:, index : index + n_quantities] = np.nan_to_num(skew(tensor, axis=1, bias=False))
+        features[:, index : index + n_quantities] = np.nan_to_num(
+            skew(tensor, axis=1, bias=False)
+        )
         new_names += [n + "_skewness" for n in names]
         index += n_quantities
         print("Done with skewness calculation", flush=True)
@@ -367,7 +372,11 @@ def compute_reductions(
     assert len(new_names) == features.shape[1]
     assert index == n_features_total
     run_gc()
-    print("About to form DataFrame in compute_reductions", flush=True)
-    df = pd.DataFrame(features, columns=new_names)
-    print("Done with compute_reductions", flush=True)
-    return df
+    if return_df:
+        print("About to form DataFrame in compute_reductions", flush=True)
+        df = pd.DataFrame(features, columns=new_names)
+        print("Done with compute_reductions", flush=True)
+        return df
+    else:
+        print("Done with compute_reductions", flush=True)
+        return features, new_names

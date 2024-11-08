@@ -1,7 +1,12 @@
 import unittest
 import numpy as np
 
-from gx_features.sequential_feature_selection import compute_features_20241107
+from gx_features.calculations import compute_reductions
+from gx_features.io import load_tensor
+from gx_features.sequential_feature_selection import (
+    compute_features_20241107,
+    reductions_20241108,
+)
 
 
 class Tests(unittest.TestCase):
@@ -60,3 +65,57 @@ class Tests(unittest.TestCase):
                 results["best_feature_name"], "min(gbdrift0_over_shat)"
             )
             np.testing.assert_allclose(results["best_score"], 0.02390338182449341)
+
+    def test_compute_reductions_2_ways(self):
+        """reductions_20241108() should match compute_reductions()."""
+        tensor, names, Y = load_tensor("test")
+        n_data, n_z, n_quantities = tensor.shape
+
+        quantiles = [0.4]
+        count_above = [0.6]
+        fft_coefficients = [3]
+        n_reductions = reductions_20241108(
+            1,
+            1,
+            quantiles=quantiles,
+            count_above=count_above,
+            fft_coefficients=fft_coefficients,
+            return_n_reductions=True,
+        )
+
+        # names = simplify_names(names)
+        extracted_features_1, _ = compute_reductions(
+            tensor,
+            names,
+            max=True,
+            min=True,
+            max_minus_min=True,
+            mean=True,
+            median=True,
+            rms=True,
+            variance=True,
+            skewness=True,
+            quantiles=quantiles,
+            count_above=count_above,
+            fft_coefficients=fft_coefficients,
+            mean_kpar=True,
+            argmax_kpar=True,
+            return_df=False,
+        )
+        np.testing.assert_equal(
+            extracted_features_1.shape[1], n_reductions * n_quantities
+        )
+        for j_quantity in range(n_quantities):
+            for j_reduction in range(n_reductions):
+                # print(f"j_quantity: {j_quantity}  j_reduction: {j_reduction}")
+                extracted_feature_2, _ = reductions_20241108(
+                    tensor[:, :, j_quantity],
+                    j_reduction,
+                    quantiles=quantiles,
+                    count_above=count_above,
+                    fft_coefficients=fft_coefficients,
+                )
+                np.testing.assert_allclose(
+                    extracted_features_1[:, j_reduction * n_quantities + j_quantity],
+                    extracted_feature_2,
+                )
