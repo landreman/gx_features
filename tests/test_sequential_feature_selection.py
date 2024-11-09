@@ -152,4 +152,6 @@ class Tests(unittest.TestCase):
         estimator = DummyEstimator(n_features=1)
 
         results = sfs(estimator, compute_fn_20241108, data, Y, verbose=1)
-        np.testing.assert_equal(len(results["names"]), 5856)
+        from mpi4py import MPI
+        if MPI.COMM_WORLD.Get_rank() == 0:
+            np.testing.assert_equal(len(results["names"]), 5856)
