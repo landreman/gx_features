@@ -152,4 +152,4 @@ class Tests(unittest.TestCase):
         estimator = DummyEstimator(n_features=1)
 
         results = sfs(estimator, compute_fn_20241108, data, Y, verbose=1)
-        np.testing.assert_equal(len(results.names), 5856)
+        np.testing.assert_equal(len(results["names"]), 5856)
