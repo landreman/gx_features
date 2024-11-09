@@ -10,7 +10,9 @@ from sklearn.preprocessing import StandardScaler
 import xgboost as xgb
 
 from .calculations import compute_mean_k_parallel
+from .combinations import add_local_shear, make_inverse_quantities, combine_tensors
 from .io import load_all
+from .utils import simplify_names
 
 
 def reductions_20241107(arr, j):
@@ -67,7 +69,6 @@ def reductions_20241108(
 
     elif j in range(8 + n_quantiles, 8 + n_quantiles + n_count_above):
         i = j - 8 - n_quantiles
-        print(f"j: {j}  i: {i}  count_above[i]: {count_above[i]}")
         return np.mean(arr > count_above[i], axis=1), f"countAbove{count_above[i]}"
 
     elif j in range(
@@ -76,7 +77,6 @@ def reductions_20241108(
     ):
         abs_fft_result = np.abs(np.fft.fft(arr, axis=1))
         i = j - 8 - n_quantiles - n_count_above
-        print(f"j: {j}  i: {i}  fft_coefficients[i]: {fft_coefficients[i]}")
         return (
             abs_fft_result[:, fft_coefficients[i]],
             f"absFFTCoeff{fft_coefficients[i]}",
@@ -131,20 +131,31 @@ def compute_fn_20241108(data, mpi_rank, mpi_size, evaluator):
     feature_tensor = data["feature_tensor"]
     scalars = data["scalars"]
     scalar_feature_matrix = data["scalar_feature_matrix"]
-    n_z_functions = len(z_functions)
+    z_functions = simplify_names(z_functions)
 
     reductions_func = reductions_20241108
+    n_reductions = reductions_func(1, 1, return_n_reductions=True)
 
     oneOverB = 1 / feature_tensor[:, :, 0]
-    n_reductions = reductions_func(1, 1, return_n_reductions=True)
+
+    # Add local shear as a feature:
+    F, F_names = add_local_shear(feature_tensor, z_functions, include_integral=False)
+    print("names at A:", F_names)
+
+    # Add inverse quantities:
+    inverse_tensor, inverse_names = make_inverse_quantities(F, F_names)
+    F, F_names = combine_tensors(F, F_names, inverse_tensor, inverse_names)
+    print("names at B:", F_names)
+    n_z_functions = len(F_names)
+    del inverse_tensor  # Free up memory
 
     index = 0
 
     for include_extra_oneOverB in [False, True]:
         # Apply all possible reductions to all of the original z-functions:
         for j_z_function in range(n_z_functions):
-            z_function_data = feature_tensor[:, :, j_z_function]
-            z_function_name = z_functions[j_z_function]
+            z_function_data = F[:, :, j_z_function]
+            z_function_name = F_names[j_z_function]
             if include_extra_oneOverB:
                 z_function_data *= oneOverB
                 z_function_name += "_/_B"
@@ -156,6 +167,31 @@ def compute_fn_20241108(data, mpi_rank, mpi_size, evaluator):
                     )
                     evaluator(reduction, f"{reduction_name}({z_function_name})", index)
                 index += 1
+
+        # Apply all possible reductions to all pairwise products of the original z-functions:
+        for j_z_function1 in range(n_z_functions):
+            z_function_data1 = F[:, :, j_z_function1]
+            z_function_name1 = F_names[j_z_function1]
+            for j_z_function2 in range(j_z_function1, n_z_functions):
+                z_function_data2 = F[:, :, j_z_function2]
+                z_function_name2 = F_names[j_z_function2]
+
+                z_function_data = z_function_data1 * z_function_data2
+                z_function_name = f"{z_function_name1}_{z_function_name2}"
+
+                if include_extra_oneOverB:
+                    z_function_data *= oneOverB
+                    z_function_name += "_/_B"
+
+                for j_reduction in range(n_reductions):
+                    if index % mpi_size == mpi_rank:
+                        reduction, reduction_name = reductions_func(
+                            z_function_data, j_reduction
+                        )
+                        evaluator(
+                            reduction, f"{reduction_name}({z_function_name})", index
+                        )
+                    index += 1
 
     # Try all the extra scalar features:
     n_scalars = len(scalars)
@@ -176,7 +212,7 @@ def compute_features_20241107():
     return results
 
 
-def sfs(estimator, compute_fn, data, Y):
+def sfs(estimator, compute_fn, data, Y, verbose=2):
     # To do later: >1 feature, fixed_features, possibly backtracking?
 
     from mpi4py import MPI
@@ -207,7 +243,9 @@ def sfs(estimator, compute_fn, data, Y):
         local_names.append(name)
         local_scores.append(score)
         local_indices.append(index)
-        print(f"[{mpi_rank}] index {index}: {name}, score: {score}", flush=True)
+        if verbose > 1:
+            print(f"[{mpi_rank}] index {index}: {name}, score: {score}", flush=True)
+
         if local_best_feature is None or score > local_best_score:
             local_best_feature = feature
             local_best_feature_name = name
@@ -257,18 +295,19 @@ def sfs(estimator, compute_fn, data, Y):
     best_feature_index = best_feature_indices[best_rank]
     best_score = best_scores[best_rank]
 
-    print("names:", names)
-    print("scores:", scores)
-    for name, score in zip(names, scores):
-        print(f"{score:6.3f}  {name}")
+    if verbose > 1:
+        for name, score in zip(names, scores):
+            print(f"{score:6.3f}  {name}")
 
-    print(
-        f"best_scores: {best_scores}  best_rank: {best_rank}  best_score: {best_score}"
-    )
-    print(f"best_feature_names: {best_feature_names}")
-    print(f"best_feature_name: {best_feature_name}")
-    print(f"best_feature_indices: {best_feature_indices}")
-    print(f"best_feature_index: {best_feature_index}")
+    if verbose > 0:
+        print("Number of features examined:", len(names))
+        print(
+            f"best_scores: {best_scores}  best_rank: {best_rank}  best_score: {best_score}"
+        )
+        print(f"best_feature_names: {best_feature_names}")
+        print(f"best_feature_name: {best_feature_name}")
+        print(f"best_feature_indices: {best_feature_indices}")
+        print(f"best_feature_index: {best_feature_index}")
 
     results = {
         "names": names,

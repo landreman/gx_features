@@ -36,9 +36,9 @@ def compute_mean_k_parallel(data, names, include_argmax=False):
     n_data, n_z, n_quantities = data.shape
 
     # Compute the Fourier transform of the data
-    print("About to run fft in compute_mean_k_parallel", flush=True)
+    # print("About to run fft in compute_mean_k_parallel", flush=True)
     data_hat = np.fft.fft(data, axis=1)
-    print("Done with fft in compute_mean_k_parallel", flush=True)
+    # print("Done with fft in compute_mean_k_parallel", flush=True)
 
     # Extract only the positive frequencies. Negative frequencies just have
     # amplitudes that are complex conjugates of the positive frequencies. Also

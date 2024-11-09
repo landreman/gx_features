@@ -2,11 +2,36 @@ import unittest
 import numpy as np
 
 from gx_features.calculations import compute_reductions
-from gx_features.io import load_tensor
+from gx_features.io import load_tensor, load_all
 from gx_features.sequential_feature_selection import (
     compute_features_20241107,
+    compute_fn_20241108,
     reductions_20241108,
+    sfs,
 )
+
+
+class DummyEstimator:
+    """Dummy estimator for testing purposes."""
+
+    def __init__(self, n_features):
+        self.n_features = n_features
+
+    def fit(self, X, y):
+        pass
+
+    def predict(self, X):
+        return np.zeros(X.shape[0])
+
+    def score(self, X, y):
+        return 0.0
+
+    def get_params(self, deep=False):
+        return {"n_features": self.n_features}
+
+    def set_params(self, **params):
+        self.n_features = params["n_features"]
+        return self
 
 
 class Tests(unittest.TestCase):
@@ -119,3 +144,12 @@ class Tests(unittest.TestCase):
                     extracted_features_1[:, j_reduction * n_quantities + j_quantity],
                     extracted_feature_2,
                 )
+
+    def test_sfs_20241108_mpi(self):
+        data = load_all("20241005 small")
+        Y = data["Y"]
+
+        estimator = DummyEstimator(n_features=1)
+
+        results = sfs(estimator, compute_fn_20241108, data, Y, verbose=1)
+        np.testing.assert_equal(len(results.names), 5856)
