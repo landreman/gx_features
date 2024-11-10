@@ -2,7 +2,7 @@
 
 FROM docker.io/ubuntu:jammy
 
-ENV DEBIAN_FRONTEND noninteractive
+ENV DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /opt
 
@@ -58,7 +58,10 @@ RUN python3 -m pip install \
     tsfresh \
     mlxtend \
     feature_engine \
-    memory_profiler \
-    https://github.com/landreman/gx_features.git
+    memory_profiler
+
+RUN python3 -m pip install .
+
+#    https://github.com/landreman/gx_features.git
     
 
