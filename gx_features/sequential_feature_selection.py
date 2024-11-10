@@ -10,7 +10,12 @@ from sklearn.preprocessing import StandardScaler
 import xgboost as xgb
 
 from .calculations import compute_mean_k_parallel
-from .combinations import add_local_shear, make_inverse_quantities, combine_tensors
+from .combinations import (
+    add_local_shear,
+    make_inverse_quantities,
+    combine_tensors,
+    heaviside_transformations,
+)
 from .io import load_all
 from .utils import simplify_names
 
@@ -127,6 +132,11 @@ def compute_fn_20241107(data, mpi_rank, mpi_size, evaluator):
 
 
 def compute_fn_20241108(data, mpi_rank, mpi_size, evaluator):
+    """
+    This set of features is nearly equivalent to the set of features from
+    create_features_20241011_01(), except that the square of each feature is
+    also allowed.
+    """
     z_functions = data["z_functions"]
     feature_tensor = data["feature_tensor"]
     scalars = data["scalars"]
@@ -135,63 +145,96 @@ def compute_fn_20241108(data, mpi_rank, mpi_size, evaluator):
 
     reductions_func = reductions_20241108
     n_reductions = reductions_func(1, 1, return_n_reductions=True)
+    print("n_reductions:", n_reductions)
 
     oneOverB = 1 / feature_tensor[:, :, 0]
 
     # Add local shear as a feature:
     F, F_names = add_local_shear(feature_tensor, z_functions, include_integral=False)
-    print("names at A:", F_names)
+    print("names after adding local shear:", F_names)
 
     # Add inverse quantities:
     inverse_tensor, inverse_names = make_inverse_quantities(F, F_names)
     F, F_names = combine_tensors(F, F_names, inverse_tensor, inverse_names)
-    print("names at B:", F_names)
+    print("names after adding inverse quantities:", F_names)
     n_z_functions = len(F_names)
     del inverse_tensor  # Free up memory
+
+    M, M_names = heaviside_transformations(F, F_names)
+    identity_tensor = np.ones((F.shape[0], F.shape[1], 1))
+    M, _ = combine_tensors(identity_tensor, [""], M, M_names)
+    M_names = [""] + ["_" + n for n in M_names]
+    n_masks = len(M_names)
+    print(f"n_masks: {n_masks}  M_names: {M_names}")
 
     index = 0
 
     for include_extra_oneOverB in [False, True]:
-        # Apply all possible reductions to all of the original z-functions:
-        for j_z_function in range(n_z_functions):
-            z_function_data = F[:, :, j_z_function]
-            z_function_name = F_names[j_z_function]
-            if include_extra_oneOverB:
-                z_function_data *= oneOverB
-                z_function_name += "_/_B"
+        if include_extra_oneOverB:
+            maybe_1_over_B = oneOverB
+            maybe_1_over_B_name = "_/_B"
+            first_z_function_index = 1  # Don't include B / B
+        else:
+            maybe_1_over_B = np.ones_like(oneOverB)
+            maybe_1_over_B_name = ""
+            first_z_function_index = 0
 
-            for j_reduction in range(n_reductions):
-                if index % mpi_size == mpi_rank:
-                    reduction, reduction_name = reductions_func(
-                        z_function_data, j_reduction
-                    )
-                    evaluator(reduction, f"{reduction_name}({z_function_name})", index)
-                index += 1
-
-        # Apply all possible reductions to all pairwise products of the original z-functions:
-        for j_z_function1 in range(n_z_functions):
-            z_function_data1 = F[:, :, j_z_function1]
-            z_function_name1 = F_names[j_z_function1]
-            for j_z_function2 in range(j_z_function1, n_z_functions):
-                z_function_data2 = F[:, :, j_z_function2]
-                z_function_name2 = F_names[j_z_function2]
-
-                z_function_data = z_function_data1 * z_function_data2
-                z_function_name = f"{z_function_name1}_{z_function_name2}"
-
-                if include_extra_oneOverB:
-                    z_function_data *= oneOverB
-                    z_function_name += "_/_B"
+        for j_mask in range(n_masks):
+            # Apply all possible reductions to all of the original z-functions:
+            for j_z_function in range(first_z_function_index, n_z_functions):
+                data = None
+                z_function_name = None
 
                 for j_reduction in range(n_reductions):
                     if index % mpi_size == mpi_rank:
-                        reduction, reduction_name = reductions_func(
-                            z_function_data, j_reduction
-                        )
+                        # Only evaluate if this proc needs to:
+                        if data is None:
+                            data = (
+                                M[:, :, j_mask] * F[:, :, j_z_function] * maybe_1_over_B
+                            )
+                            z_function_name = f"{F_names[j_z_function]}{maybe_1_over_B_name}{M_names[j_mask]}"
+
+                        reduction, reduction_name = reductions_func(data, j_reduction)
                         evaluator(
                             reduction, f"{reduction_name}({z_function_name})", index
                         )
                     index += 1
+
+            # Apply all possible reductions to all pairwise products of the original z-functions:
+            for j_z_function1 in range(first_z_function_index, n_z_functions):
+                name1 = F_names[j_z_function1]
+                # In make_feature_product_combinations(), used by create_features_20241011_01, we don't square any of the
+                # features, so the starting index on the next line would be
+                # j_z_function1 + 1.
+                for j_z_function2 in range(j_z_function1, n_z_functions):
+                    name2 = F_names[j_z_function2]
+
+                    if name1 == "1/" + name2 or name2 == "1/" + name1:
+                        # Don't multiply a feature by its own inverse
+                        continue
+
+                    data = None
+                    z_function_name = None
+
+                    for j_reduction in range(n_reductions):
+                        if index % mpi_size == mpi_rank:
+                            # Only evaluate if this proc needs to:
+                            if data is None:
+                                data = (
+                                    M[:, :, j_mask]
+                                    * F[:, :, j_z_function1]
+                                    * F[:, :, j_z_function2]
+                                    * maybe_1_over_B
+                                )
+                                z_function_name = f"{name1}_x_{name2}{maybe_1_over_B_name}{M_names[j_mask]}"
+
+                            reduction, reduction_name = reductions_func(
+                                data, j_reduction
+                            )
+                            evaluator(
+                                reduction, f"{reduction_name}({z_function_name})", index
+                            )
+                        index += 1
 
     # Try all the extra scalar features:
     n_scalars = len(scalars)
@@ -203,7 +246,7 @@ def compute_fn_20241108(data, mpi_rank, mpi_size, evaluator):
 def compute_features_20241107():
     print("About to load data", flush=True)
     data = load_all("20241005 small")
-    print("Done loading load data", flush=True)
+    print("Done loading data", flush=True)
     Y = data["Y"]
 
     estimator = make_pipeline(StandardScaler(), xgb.XGBRegressor(n_jobs=1))
@@ -286,7 +329,7 @@ def sfs(estimator, compute_fn, data, Y, verbose=2):
     permutation = np.argsort(indices)
     indices = np.array(indices)[permutation]
     scores = np.array(scores)[permutation]
-    names = list(np.array(names)[permutation])
+    names = np.array(names)[permutation]
 
     # Find the best feature across all ranks:
     best_rank = np.argmax(best_scores)
@@ -296,11 +339,12 @@ def sfs(estimator, compute_fn, data, Y, verbose=2):
     best_score = best_scores[best_rank]
 
     if verbose > 1:
+        print("\n----- Scores of each feature in the order the features were generated -----")
         for name, score in zip(names, scores):
             print(f"{score:6.3f}  {name}")
 
     if verbose > 0:
-        print("Number of features examined:", len(names))
+        print("\n----- Results separated by MPI rank -----")
         print(
             f"best_scores: {best_scores}  best_rank: {best_rank}  best_score: {best_score}"
         )
@@ -308,6 +352,15 @@ def sfs(estimator, compute_fn, data, Y, verbose=2):
         print(f"best_feature_name: {best_feature_name}")
         print(f"best_feature_indices: {best_feature_indices}")
         print(f"best_feature_index: {best_feature_index}")
+
+        print("\n----- Best features -----")
+        permutation = np.argsort(-scores)
+        n_features_to_print = min(30, len(names))
+        for j in range(n_features_to_print):
+            k = permutation[j]
+            print(f"feature {j:2}  R2={scores[k]:6.3g} {names[k]}")
+
+        print("Number of features examined:", len(names))
 
     results = {
         "names": names,

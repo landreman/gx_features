@@ -41,7 +41,7 @@ class Tests(unittest.TestCase):
         if results is not None:
             # Results are only returned on rank 0
 
-            assert results["names"] == [
+            assert list(results["names"]) == [
                 "min(bmag)",
                 "max(bmag)",
                 "min(gbdrift)",
@@ -153,5 +153,6 @@ class Tests(unittest.TestCase):
 
         results = sfs(estimator, compute_fn_20241108, data, Y, verbose=1)
         from mpi4py import MPI
+
         if MPI.COMM_WORLD.Get_rank() == 0:
-            np.testing.assert_equal(len(results["names"]), 5856)
+            np.testing.assert_equal(len(results["names"]), 57270)
