@@ -60,7 +60,8 @@ RUN python3 -m pip install \
     feature_engine \
     memory_profiler
 
-RUN python3 -m pip install .
+# RUN python3 -m pip install .
+RUN python3 -m pip install git+https://github.com/landreman/gx_features.git
 
 #    https://github.com/landreman/gx_features.git
     
