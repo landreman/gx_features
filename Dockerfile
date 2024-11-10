@@ -14,6 +14,7 @@ RUN \
         gfortran             \
         libcurl4             \
         wget                 \
+        git \
         vim              &&  \
     apt-get clean all    &&  \
     rm -rf /var/lib/apt/lists/*
