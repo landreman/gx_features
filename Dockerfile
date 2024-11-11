@@ -41,7 +41,7 @@ RUN \
     tar xvzf $mpich_prefix.tar.gz                                           && \
     cd $mpich_prefix                                                        && \
     FFLAGS=-fallow-argument-mismatch FCFLAGS=-fallow-argument-mismatch ./configure            && \
-    make -j 16                                                              && \
+    make -j                                                                 && \
     make install                                                            && \
     make clean                                                              && \
     cd ..                                                                   && \
