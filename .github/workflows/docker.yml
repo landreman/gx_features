@@ -10,6 +10,7 @@ on:
       - main
       - container
       - container2
+      - container3
 
 jobs:
   docker:
@@ -35,4 +36,4 @@ jobs:
         with:
           file: Dockerfile
           push: true
-          tags: landreman/nersc_original
+          tags: landreman/nersc_original:mpi4py3.1.6

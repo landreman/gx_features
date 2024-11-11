@@ -45,4 +45,4 @@ RUN \
 
 RUN /sbin/ldconfig
 
-RUN python3 -m pip install mpi4py
+RUN python3 -m pip install mpi4py==3.1.6
