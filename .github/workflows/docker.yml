@@ -9,6 +9,7 @@ on:
     branches:
       - main
       - container
+      - container2
 
 jobs:
   docker:
@@ -34,5 +35,4 @@ jobs:
         with:
           file: Dockerfile
           push: true
-          tags: landreman/machine_learning:38
-
+          tags: landreman/nersc_original

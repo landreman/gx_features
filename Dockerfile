@@ -2,7 +2,7 @@
 
 FROM docker.io/ubuntu:jammy
 
-ENV DEBIAN_FRONTEND=noninteractive
+ENV DEBIAN_FRONTEND noninteractive
 
 WORKDIR /opt
 
@@ -14,7 +14,6 @@ RUN \
         gfortran             \
         libcurl4             \
         wget                 \
-        git \
         vim              &&  \
     apt-get clean all    &&  \
     rm -rf /var/lib/apt/lists/*
@@ -22,15 +21,12 @@ RUN \
 
 #install miniconda 3.8 (req'd for mpi4py with this OS config)
 ENV installer=Miniconda3-py38_4.12.0-Linux-x86_64.sh
-# ENV installer=Miniconda3-latest-Linux-x86_64.sh
 
 RUN wget https://repo.anaconda.com/miniconda/$installer && \
     /bin/bash $installer -b -p /opt/miniconda3          && \
     rm -rf $installer
 
 ENV PATH=/opt/miniconda3/bin:$PATH
-
-RUN python3 --version
 
 #need to install mpich in the image
 ARG mpich=4.0.2
@@ -41,7 +37,7 @@ RUN \
     tar xvzf $mpich_prefix.tar.gz                                           && \
     cd $mpich_prefix                                                        && \
     FFLAGS=-fallow-argument-mismatch FCFLAGS=-fallow-argument-mismatch ./configure            && \
-    make -j                                                                 && \
+    make -j 16                                                              && \
     make install                                                            && \
     make clean                                                              && \
     cd ..                                                                   && \
@@ -49,23 +45,4 @@ RUN \
 
 RUN /sbin/ldconfig
 
-RUN python3 -m pip install \
-    mpi4py \
-    numpy \
-    scipy \
-    scikit-learn \
-    matplotlib \
-    pandas \
-    xgboost \
-    lightgbm \
-    tsfresh \
-    mlxtend \
-    feature_engine \
-    memory_profiler
-
-# RUN python3 -m pip install .
-RUN python3 -m pip install git+https://github.com/landreman/gx_features.git
-
-#    https://github.com/landreman/gx_features.git
-    
-
+RUN python3 -m pip install mpi4py
