@@ -21,14 +21,16 @@ RUN \
 
 
 #install miniconda 3.8 (req'd for mpi4py with this OS config)
-#ENV installer=Miniconda3-py38_4.12.0-Linux-x86_64.sh
-ENV installer=Miniconda3-latest-Linux-x86_64.sh
+ENV installer=Miniconda3-py38_4.12.0-Linux-x86_64.sh
+# ENV installer=Miniconda3-latest-Linux-x86_64.sh
 
 RUN wget https://repo.anaconda.com/miniconda/$installer && \
     /bin/bash $installer -b -p /opt/miniconda3          && \
     rm -rf $installer
 
 ENV PATH=/opt/miniconda3/bin:$PATH
+
+RUN python3 --version
 
 #need to install mpich in the image
 ARG mpich=4.0.2

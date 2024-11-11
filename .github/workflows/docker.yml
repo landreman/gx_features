@@ -9,7 +9,7 @@ on:
     branches:
       - main
       - container
-      
+
 jobs:
   docker:
     runs-on: ubuntu-latest
@@ -34,5 +34,5 @@ jobs:
         with:
           file: Dockerfile
           push: true
-          tags: landreman/machine_learning
+          tags: landreman/machine_learning:38
 
