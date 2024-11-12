@@ -4,9 +4,10 @@
 
 import numpy as np
 from scipy.stats import skew
-from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import cross_val_score, KFold
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
+
 import xgboost as xgb
 
 from .calculations import compute_mean_k_parallel
@@ -272,6 +273,7 @@ def sfs(estimator, compute_fn, data, Y, verbose=2):
     local_best_feature_name = None
     local_best_feature_index = -1
     local_best_score = -1
+    cv = KFold(n_splits=5, shuffle=True)
 
     def evaluator(feature, name, index):
         # If this mpi process owns this feature, then compute the R^2 score and
@@ -281,7 +283,8 @@ def sfs(estimator, compute_fn, data, Y, verbose=2):
         if index % mpi_size != mpi_rank:
             return
 
-        score_arr = cross_val_score(estimator, feature.reshape((-1, 1)), Y, cv=5)
+        # Specify a cv because otherwise the default is to have shuffle=False:
+        score_arr = cross_val_score(estimator, feature.reshape((-1, 1)), Y, cv=cv)
         score = score_arr.mean()
         local_names.append(name)
         local_scores.append(score)

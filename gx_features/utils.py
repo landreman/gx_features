@@ -1,7 +1,6 @@
 import re
 import numpy as np
 from pandas import DataFrame, read_pickle
-from tsfresh import extract_features
 from feature_engine.selection import DropConstantFeatures
 
 from .io import load_tensor
@@ -42,6 +41,7 @@ def make_test_dataframe():
         "fft_coefficient": [{"attr": "abs", "coeff": 1}],
     }
 
+    from tsfresh import extract_features
     extracted_features = extract_features(
         df,
         column_id="j_tube",

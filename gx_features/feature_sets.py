@@ -986,7 +986,7 @@ def create_features_20240906_01(n_data=None):
     features.to_pickle(filename + ".pkl")
 
 # @profile
-def create_features_20241011_01(n_data=None, mpi=False):
+def create_features_20241011_01(n_data=None, mpi=False, dataset="20241005"):
     """
     Same as 20240804_01, but for finite-beta rather than vacuum, so cvdrift is
     also included. Also, the scalar features [nfp, iota, shat, d_pressure_d_s]
@@ -996,7 +996,7 @@ def create_features_20241011_01(n_data=None, mpi=False):
     If n_data is an integer, the data will be trimmed to the first n_data entries.
     """
     start_time = time.time()
-    data = load_all("20241005")
+    data = load_all(dataset)
     print(time.time() - start_time, "Done loading data", flush=True)
     raw_tensor = data["feature_tensor"]
     raw_names = data["z_functions"]
@@ -1126,7 +1126,7 @@ def create_features_20241011_01(n_data=None, mpi=False):
         features["Y"] = Y
         drop_special_characters_from_column_names(features)
 
-        filename = "20241005-01_features_20241011_01"
+        filename = dataset + "-01_features_20241011_01"
         features.to_pickle(filename + ".pkl")
 
         return features

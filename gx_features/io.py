@@ -6,13 +6,17 @@ import numpy as np
 """Boolean indicating if we are in the GitHub actions CI"""
 in_github_actions = "CI" in os.environ and os.environ['CI'].lower() in ['1', 'true']
 
+"""Boolean indicating if we are on Matt's laptop"""
+on_laptop = os.environ["HOME"] == "/Users/mattland"
+
 def load_all(dataset):
     this_dir = os.path.dirname(os.path.abspath(__file__))
     test_file_dir = os.path.join(this_dir, "..", "tests", "files")
-    data_dir = "/Users/mattland/Box/work24"
-    # data_dir = "."
+    data_dir = "."
     if in_github_actions:
         data_dir = test_file_dir
+    if on_laptop:
+        data_dir = "/Users/mattland/Box/work24"
 
     if dataset == "test":
         # File with the flux tube geometries (raw features):
@@ -61,6 +65,17 @@ def load_all(dataset):
         out_filename = os.path.join(
             data_dir,
             "20241004-01-random_stellarator_equilibria_GX_results_combined_rows43.pkl",
+        )
+    elif dataset == "20241103":
+        # File with the flux tube geometries (raw features):
+        in_filename = os.path.join(
+            data_dir,
+            "20241103-01-assembleFluxTubeTensor_multiNfp_finiteBeta_randomAspect_nz96_51200tubes.pkl",
+        )
+        # File with the GX heat flux
+        out_filename = os.path.join(
+            data_dir,
+            "20241103-01-random_stellarator_equilibria_finiteBeta_randomAspect_allNFP_GX_results_combined.pkl",
         )
     else:
         raise ValueError(f"Unknown dataset: {dataset}")
