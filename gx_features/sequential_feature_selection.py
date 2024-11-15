@@ -280,12 +280,15 @@ def compute_fn_20241115(data, mpi_rank, mpi_size, evaluator):
     thresholds = np.arange(-1, 1.05, 0.1)
     n_thresholds = len(thresholds)
     print("n_thresholds:", n_thresholds)
+    print("About to allocate activation_functions", flush=True)
     activation_functions = np.zeros(
         (n_data, n_z, n_thresholds * n_activation_functions)
     )
+    print("About to allocate longest_true_interval_masks", flush=True)
     longest_true_interval_masks = compute_mask_for_longest_true_interval(
         cvdrift[:, :, None] - thresholds[None, None, :] > 0
     )
+    print("Done with allocations", flush=True)
 
     activation_function_names = []
     for j_activation_function in range(n_activation_functions):
@@ -324,7 +327,7 @@ def compute_fn_20241115(data, mpi_rank, mpi_size, evaluator):
             else:
                 raise RuntimeError("Should not get here")
             activation_function_names.append(name)
-    print("activation_function_names:", activation_function_names)
+    print("activation_function_names:", activation_function_names, flush=True)
 
     powers_of_gds22 = [0.5, 1, 2]
     powers_of_cvdrift = [
@@ -373,6 +376,8 @@ def compute_fn_20241115(data, mpi_rank, mpi_size, evaluator):
                                 data, j_reduction
                             )
                             evaluator(reduction, f"{reduction_name}({name})", index)
+                            if index % 1000 == 0:
+                                print(f"index: {index}  name: {name}", flush=True)
                         index += 1
 
 

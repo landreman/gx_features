@@ -167,4 +167,4 @@ class Tests(unittest.TestCase):
 
         estimator = DummyEstimator(n_features=1)
 
-        results = sfs(estimator, compute_fn_20241115, data, Y, verbose=2)
+        results = sfs(estimator, compute_fn_20241115, data, Y, verbose=1)
