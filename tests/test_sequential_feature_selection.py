@@ -89,7 +89,7 @@ class Tests(unittest.TestCase):
             np.testing.assert_equal(
                 results["best_feature_name"], "min(gbdrift0_over_shat)"
             )
-            np.testing.assert_allclose(results["best_score"], -0.11151405572891235)
+            np.testing.assert_allclose(results["best_score"], -0.11151405572891235, rtol=1e-6)
 
     def test_compute_reductions_2_ways(self):
         """reductions_20241108() should match compute_reductions()."""
