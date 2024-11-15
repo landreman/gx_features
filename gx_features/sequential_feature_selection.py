@@ -276,7 +276,7 @@ def compute_fn_20241115(data, mpi_rank, mpi_size, evaluator):
     bmag = feature_tensor[:, :, index]
     assert z_functions[index] == "bmag"
 
-    n_activation_functions = 6
+    n_activation_functions = 5
     thresholds = np.arange(-1, 1.05, 0.1)
     n_thresholds = len(thresholds)
     print("n_thresholds:", n_thresholds)
