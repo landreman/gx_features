@@ -6,6 +6,7 @@ from gx_features.io import load_tensor, load_all
 from gx_features.sequential_feature_selection import (
     compute_features_20241107,
     compute_fn_20241108,
+    compute_fn_20241115,
     reductions_20241108,
     sfs,
 )
@@ -89,7 +90,9 @@ class Tests(unittest.TestCase):
             np.testing.assert_equal(
                 results["best_feature_name"], "min(gbdrift0_over_shat)"
             )
-            np.testing.assert_allclose(results["best_score"], -0.11151405572891235, rtol=1e-6)
+            np.testing.assert_allclose(
+                results["best_score"], -0.11151405572891235, rtol=1e-6
+            )
 
     def test_compute_reductions_2_ways(self):
         """reductions_20241108() should match compute_reductions()."""
@@ -156,3 +159,12 @@ class Tests(unittest.TestCase):
 
         if MPI.COMM_WORLD.Get_rank() == 0:
             np.testing.assert_equal(len(results["names"]), 57270)
+
+    @unittest.skip
+    def test_sfs_20241115_mpi(self):
+        data = load_all("20241005 small")
+        Y = data["Y"]
+
+        estimator = DummyEstimator(n_features=1)
+
+        results = sfs(estimator, compute_fn_20241115, data, Y, verbose=2)

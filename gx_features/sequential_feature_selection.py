@@ -10,7 +10,10 @@ from sklearn.preprocessing import StandardScaler
 
 import xgboost as xgb
 
-from .calculations import compute_mean_k_parallel
+from .calculations import (
+    compute_mean_k_parallel,
+    compute_mask_for_longest_true_interval,
+)
 from .combinations import (
     add_local_shear,
     make_inverse_quantities,
@@ -242,6 +245,135 @@ def compute_fn_20241108(data, mpi_rank, mpi_size, evaluator):
     for j in range(n_scalars):
         evaluator(scalar_feature_matrix[:, j], scalars[j], index)
         index += 1
+
+
+def compute_fn_20241115(data, mpi_rank, mpi_size, evaluator):
+    """
+    Focus on just the first feature, and try quantities similar to
+    Variance(Heaviside(cvdrift) * gds22 * B^{-2}).
+
+    See create_features_20240805_01() for a similar set of features.
+    """
+    z_functions = data["z_functions"]
+    feature_tensor = data["feature_tensor"]
+    z_functions = simplify_names(z_functions)
+
+    reductions_func = reductions_20241108
+    n_reductions = reductions_func(1, 1, return_n_reductions=True)
+    print("n_reductions:", n_reductions)
+
+    n_data, n_z, n_quantities = feature_tensor.shape
+
+    index = 2
+    cvdrift = feature_tensor[:, :, index]
+    assert z_functions[index] == "cvdrift"
+
+    index = 6
+    gds22 = feature_tensor[:, :, index]
+    assert z_functions[index] == "gds22"
+
+    index = 0
+    bmag = feature_tensor[:, :, index]
+    assert z_functions[index] == "bmag"
+
+    n_activation_functions = 6
+    thresholds = np.arange(-1, 1.05, 0.1)
+    n_thresholds = len(thresholds)
+    print("n_thresholds:", n_thresholds)
+    activation_functions = np.zeros(
+        (n_data, n_z, n_thresholds * n_activation_functions)
+    )
+    longest_true_interval_masks = compute_mask_for_longest_true_interval(
+        cvdrift[:, :, None] - thresholds[None, None, :] > 0
+    )
+
+    activation_function_names = []
+    for j_activation_function in range(n_activation_functions):
+        for j_threshold, threshold in enumerate(thresholds):
+            index = j_activation_function * n_thresholds + j_threshold
+            x = cvdrift - threshold
+            if j_activation_function == 0:
+                activation_functions[:, :, index] = np.heaviside(x, 0)
+                name = f"heaviside{threshold:.2f}"
+            elif j_activation_function == 1:
+                activation_functions[:, :, index] = 1 / (1 + np.exp(-x))
+                name = f"sigmoid{threshold:.2f}"
+            elif j_activation_function == 2:
+                alpha = 0.05
+                activation_functions[:, :, index] = alpha + (1 - alpha) * np.heaviside(
+                    x, 0
+                )
+                name = f"leakyHeaviside{alpha:.2f}_{threshold:.2f}"
+            elif j_activation_function == 3:
+                alpha = 0.1
+                activation_functions[:, :, index] = alpha + (1 - alpha) * np.heaviside(
+                    x, 0
+                )
+                name = f"leakyHeaviside{alpha:.2f}_{threshold:.2f}"
+            elif j_activation_function == 4:
+                alpha = 0.2
+                activation_functions[:, :, index] = alpha + (1 - alpha) * np.heaviside(
+                    x, 0
+                )
+                name = f"leakyHeaviside{alpha:.2f}_{threshold:.2f}"
+            elif j_activation_function == 5:
+                activation_functions[:, :, index] = longest_true_interval_masks[
+                    :, :, j_threshold
+                ]
+                name = f"longestcvdriftPosInterval{threshold:.2f}"
+            else:
+                raise RuntimeError("Should not get here")
+            activation_function_names.append(name)
+    print("activation_function_names:", activation_function_names)
+
+    powers_of_gds22 = [0.5, 1, 2]
+    powers_of_cvdrift = [
+        0,
+        1,
+    ]  # Fractional powers disallowed because cvdrift can be <0.
+    powers_of_bmag = [0, -1, -1.5, -2, -2.5, -3]
+    n_powers_of_gds22 = len(powers_of_gds22)
+    n_powers_of_cvdrift = len(powers_of_cvdrift)
+    n_powers_of_bmag = len(powers_of_bmag)
+
+    print("*" * 80)
+    print(
+        "Total number of features to consider:",
+        n_activation_functions
+        * n_thresholds
+        * n_powers_of_bmag
+        * n_powers_of_gds22
+        * n_powers_of_cvdrift
+        * n_reductions,
+    )
+    print("*" * 80)
+
+    index = 0
+    for j_activation_function in range(n_activation_functions * n_thresholds):
+        for j_power_of_bmag, power_of_bmag in enumerate(powers_of_bmag):
+            for j_power_of_gds22, power_of_gds22 in enumerate(powers_of_gds22):
+                for j_power_of_cvdrift, power_of_cvdrift in enumerate(
+                    powers_of_cvdrift
+                ):
+                    for j_reduction in range(n_reductions):
+                        if index % mpi_size == mpi_rank:
+                            data = (
+                                activation_functions[:, :, j_activation_function]
+                                * gds22**power_of_gds22
+                                * bmag**power_of_bmag
+                                * cvdrift**power_of_cvdrift
+                            )
+                            name = (
+                                f"{activation_function_names[j_activation_function]}"
+                                f"_gds22^{power_of_gds22}"
+                                f"_bmag^{power_of_bmag}"
+                                f"_cvdrift^{power_of_cvdrift}"
+                            )
+                            reduction, reduction_name = reductions_func(
+                                data, j_reduction
+                            )
+                            evaluator(reduction, f"{reduction_name}({name})", index)
+                        index += 1
 
 
 def compute_features_20241107():
