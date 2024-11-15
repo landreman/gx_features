@@ -280,54 +280,6 @@ def compute_fn_20241115(data, mpi_rank, mpi_size, evaluator):
     thresholds = np.arange(-1, 1.05, 0.1)
     n_thresholds = len(thresholds)
     print("n_thresholds:", n_thresholds)
-    print("About to allocate activation_functions", flush=True)
-    activation_functions = np.zeros(
-        (n_data, n_z, n_thresholds * n_activation_functions)
-    )
-    print("About to allocate longest_true_interval_masks", flush=True)
-    longest_true_interval_masks = compute_mask_for_longest_true_interval(
-        cvdrift[:, :, None] - thresholds[None, None, :] > 0
-    )
-    print("Done with allocations", flush=True)
-
-    activation_function_names = []
-    for j_activation_function in range(n_activation_functions):
-        for j_threshold, threshold in enumerate(thresholds):
-            index = j_activation_function * n_thresholds + j_threshold
-            x = cvdrift - threshold
-            if j_activation_function == 0:
-                activation_functions[:, :, index] = np.heaviside(x, 0)
-                name = f"heaviside{threshold:.2f}"
-            elif j_activation_function == 1:
-                activation_functions[:, :, index] = 1 / (1 + np.exp(-x))
-                name = f"sigmoid{threshold:.2f}"
-            elif j_activation_function == 2:
-                alpha = 0.05
-                activation_functions[:, :, index] = alpha + (1 - alpha) * np.heaviside(
-                    x, 0
-                )
-                name = f"leakyHeaviside{alpha:.2f}_{threshold:.2f}"
-            elif j_activation_function == 3:
-                alpha = 0.1
-                activation_functions[:, :, index] = alpha + (1 - alpha) * np.heaviside(
-                    x, 0
-                )
-                name = f"leakyHeaviside{alpha:.2f}_{threshold:.2f}"
-            elif j_activation_function == 4:
-                alpha = 0.2
-                activation_functions[:, :, index] = alpha + (1 - alpha) * np.heaviside(
-                    x, 0
-                )
-                name = f"leakyHeaviside{alpha:.2f}_{threshold:.2f}"
-            elif j_activation_function == 5:
-                activation_functions[:, :, index] = longest_true_interval_masks[
-                    :, :, j_threshold
-                ]
-                name = f"longestcvdriftPosInterval{threshold:.2f}"
-            else:
-                raise RuntimeError("Should not get here")
-            activation_function_names.append(name)
-    print("activation_function_names:", activation_function_names, flush=True)
 
     powers_of_gds22 = [0.5, 1, 2]
     powers_of_cvdrift = [
@@ -349,36 +301,65 @@ def compute_fn_20241115(data, mpi_rank, mpi_size, evaluator):
         * n_powers_of_cvdrift
         * n_reductions,
     )
-    print("*" * 80)
+    print("*" * 80, flush=True)
 
     index = 0
-    for j_activation_function in range(n_activation_functions * n_thresholds):
-        for j_power_of_bmag, power_of_bmag in enumerate(powers_of_bmag):
-            for j_power_of_gds22, power_of_gds22 in enumerate(powers_of_gds22):
-                for j_power_of_cvdrift, power_of_cvdrift in enumerate(
-                    powers_of_cvdrift
-                ):
-                    for j_reduction in range(n_reductions):
-                        if index % mpi_size == mpi_rank:
-                            data = (
-                                activation_functions[:, :, j_activation_function]
-                                * gds22**power_of_gds22
-                                * bmag**power_of_bmag
-                                * cvdrift**power_of_cvdrift
-                            )
-                            name = (
-                                f"{activation_function_names[j_activation_function]}"
-                                f"_gds22^{power_of_gds22}"
-                                f"_bmag^{power_of_bmag}"
-                                f"_cvdrift^{power_of_cvdrift}"
-                            )
-                            reduction, reduction_name = reductions_func(
-                                data, j_reduction
-                            )
-                            evaluator(reduction, f"{reduction_name}({name})", index)
-                            if index % 1000 == 0:
-                                print(f"index: {index}  name: {name}", flush=True)
-                        index += 1
+    for j_activation_function in range(n_activation_functions):
+        for j_threshold, threshold in enumerate(thresholds):
+            x = cvdrift - threshold
+            if j_activation_function == 0:
+                activation_function = np.heaviside(x, 0)
+                activation_function_name = f"heaviside{threshold:.2f}"
+            elif j_activation_function == 1:
+                activation_function = 1 / (1 + np.exp(-x))
+                activation_function_name = f"sigmoid{threshold:.2f}"
+            elif j_activation_function == 2:
+                alpha = 0.05
+                activation_function = alpha + (1 - alpha) * np.heaviside(
+                    x, 0
+                )
+                activation_function_name = f"leakyHeaviside{alpha:.2f}_{threshold:.2f}"
+            elif j_activation_function == 3:
+                alpha = 0.1
+                activation_function = alpha + (1 - alpha) * np.heaviside(
+                    x, 0
+                )
+                activation_function_name = f"leakyHeaviside{alpha:.2f}_{threshold:.2f}"
+            elif j_activation_function == 4:
+                alpha = 0.2
+                activation_function = alpha + (1 - alpha) * np.heaviside(
+                    x, 0
+                )
+                activation_function_name = f"leakyHeaviside{alpha:.2f}_{threshold:.2f}"
+            else:
+                raise RuntimeError("Should not get here")
+
+            for j_power_of_bmag, power_of_bmag in enumerate(powers_of_bmag):
+                for j_power_of_gds22, power_of_gds22 in enumerate(powers_of_gds22):
+                    for j_power_of_cvdrift, power_of_cvdrift in enumerate(
+                        powers_of_cvdrift
+                    ):
+                        for j_reduction in range(n_reductions):
+                            if index % mpi_size == mpi_rank:
+                                data = (
+                                    activation_function
+                                    * gds22**power_of_gds22
+                                    * bmag**power_of_bmag
+                                    * cvdrift**power_of_cvdrift
+                                )
+                                name = (
+                                    f"{activation_function_name}"
+                                    f"_gds22^{power_of_gds22}"
+                                    f"_bmag^{power_of_bmag}"
+                                    f"_cvdrift^{power_of_cvdrift}"
+                                )
+                                reduction, reduction_name = reductions_func(
+                                    data, j_reduction
+                                )
+                                evaluator(reduction, f"{reduction_name}({name})", index)
+                                if index % 1000 == 0:
+                                    print(f"index: {index}  name: {name}", flush=True)
+                            index += 1
 
 
 def compute_features_20241107():
