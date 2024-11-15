@@ -11,3 +11,6 @@ mlxtend
 shap
 memory_profiler
 mpi4py
+# pytest seems to be required for tsfresh but is not listed in its requirements.
+# If we don't include it here, the CI fails.
+pytest

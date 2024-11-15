@@ -273,7 +273,7 @@ def sfs(estimator, compute_fn, data, Y, verbose=2):
     local_best_feature_name = None
     local_best_feature_index = -1
     local_best_score = -1
-    cv = KFold(n_splits=5, shuffle=True)
+    cv = KFold(n_splits=5, shuffle=True, random_state=42)
 
     def evaluator(feature, name, index):
         # If this mpi process owns this feature, then compute the R^2 score and
@@ -342,7 +342,9 @@ def sfs(estimator, compute_fn, data, Y, verbose=2):
     best_score = best_scores[best_rank]
 
     if verbose > 1:
-        print("\n----- Scores of each feature in the order the features were generated -----")
+        print(
+            "\n----- Scores of each feature in the order the features were generated -----"
+        )
         for name, score in zip(names, scores):
             print(f"{score:6.3f}  {name}")
 

@@ -64,24 +64,24 @@ class Tests(unittest.TestCase):
             np.testing.assert_allclose(
                 results["scores"],
                 [
-                    -1.24743416,
-                    -0.7789896,
-                    -1.43405595,
-                    -0.86996129,
-                    -0.78987402,
-                    -0.8206272,
-                    0.02390338,
-                    -0.16311725,
-                    -0.81661642,
-                    -1.01757281,
-                    -1.43039036,
-                    -1.98132601,
-                    -1.03986593,
-                    -0.20190021,
-                    -0.03772788,
-                    -0.51621311,
-                    -0.51270387,
-                    -0.54295611,
+                    -2.21912,
+                    -1.623042,
+                    -1.855183,
+                    -1.522255,
+                    -1.370325,
+                    -1.327524,
+                    -0.111514,
+                    -0.277382,
+                    -0.764641,
+                    -1.548852,
+                    -1.63394,
+                    -2.044135,
+                    -1.383299,
+                    -0.534497,
+                    -0.458563,
+                    -1.981815,
+                    -1.981366,
+                    -1.981896,
                 ],
                 rtol=1e-5,
             )
@@ -89,7 +89,7 @@ class Tests(unittest.TestCase):
             np.testing.assert_equal(
                 results["best_feature_name"], "min(gbdrift0_over_shat)"
             )
-            np.testing.assert_allclose(results["best_score"], 0.02390338182449341)
+            np.testing.assert_allclose(results["best_score"], -0.11151405572891235)
 
     def test_compute_reductions_2_ways(self):
         """reductions_20241108() should match compute_reductions()."""
