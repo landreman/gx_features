@@ -19,6 +19,7 @@ from .calculations import (
     compute_max_minus_min,
     compute_reductions,
     compute_mask_for_longest_true_interval,
+    differentiate,
 )
 from .combinations import (
     add_local_shear,
@@ -33,11 +34,13 @@ from .combinations import (
     divide_by_quantity,
 )
 from .mpi import distribute_work_mpi, join_dataframes_mpi
+from .sequential_feature_selection import reductions_20241108
 from .utils import (
     tensor_to_tsfresh_dataframe,
     drop_nearly_constant_features,
     drop_special_characters_from_column_names,
     simplify_names,
+    meaningful_names,
 )
 
 n_logical_threads = psutil.cpu_count(logical=True)
@@ -46,6 +49,7 @@ n_logical_threads = psutil.cpu_count(logical=True)
 def run_gc():
     # gc.collect(); gc.collect(); gc.collect()
     pass
+
 
 def check_for_NaNs(extracted_features):
     """Check a DataFrame for any NaNs and report their locations."""
@@ -985,6 +989,7 @@ def create_features_20240906_01(n_data=None):
 
     features.to_pickle(filename + ".pkl")
 
+
 # @profile
 def create_features_20241011_01(n_data=None, mpi=False, dataset="20241005"):
     """
@@ -1013,9 +1018,13 @@ def create_features_20241011_01(n_data=None, mpi=False, dataset="20241005"):
 
     if mpi:
         from .mpi import proc0_print
-        raw_tensor, extra_scalar_features = distribute_work_mpi(raw_tensor, extra_scalar_features)
+
+        raw_tensor, extra_scalar_features = distribute_work_mpi(
+            raw_tensor, extra_scalar_features
+        )
         from mpi4py import MPI
-        proc0 = (MPI.COMM_WORLD.rank == 0)
+
+        proc0 = MPI.COMM_WORLD.rank == 0
     else:
         proc0_print = print
         proc0 = True
@@ -1029,13 +1038,23 @@ def create_features_20241011_01(n_data=None, mpi=False, dataset="20241005"):
     print(time.time() - start_time, "Done creating inverse quantities", flush=True)
     F, F_names = combine_tensors(F, F_names, inverse_tensor, inverse_names)
     del inverse_tensor  # Free up memory
-    print(time.time() - start_time, "Done combining inverse quantities with original raw features", flush=True)
+    print(
+        time.time() - start_time,
+        "Done combining inverse quantities with original raw features",
+        flush=True,
+    )
 
     CF, CF_names = make_feature_product_combinations(F, F_names)
-    print(time.time() - start_time, "Done forming feature product combinations", flush=True)
+    print(
+        time.time() - start_time,
+        "Done forming feature product combinations",
+        flush=True,
+    )
 
     M, M_names = heaviside_transformations(F, F_names)
-    proc0_print(time.time() - start_time, "Done creating Heaviside transformations", flush=True)
+    proc0_print(
+        time.time() - start_time, "Done creating Heaviside transformations", flush=True
+    )
     proc0_print("M_names:", M_names, flush=True)
 
     MF, MF_names = make_pairwise_products_from_2_sets(F, F_names, M, M_names)
@@ -1047,7 +1066,11 @@ def create_features_20241011_01(n_data=None, mpi=False, dataset="20241005"):
         F, F_names, MF, MF_names, CF, CF_names, MCF, MCF_names
     )
     del F, MF, CF, MCF  # Free up memory
-    print(time.time() - start_time, "Done combining tensors before dividing by bmag", flush=True)
+    print(
+        time.time() - start_time,
+        "Done combining tensors before dividing by bmag",
+        flush=True,
+    )
 
     tensor_after_inv_bmag, names_after_inv_bmag = divide_by_quantity(
         tensor_before_inv_bmag, names_before_inv_bmag, raw_tensor[:, :, 0], "bmag"
@@ -1061,7 +1084,11 @@ def create_features_20241011_01(n_data=None, mpi=False, dataset="20241005"):
         names_after_inv_bmag,
     )
     del tensor_before_inv_bmag, tensor_after_inv_bmag  # Free up memory
-    print(time.time() - start_time, "Done combining tensors with and without 1/B", flush=True)
+    print(
+        time.time() - start_time,
+        "Done combining tensors with and without 1/B",
+        flush=True,
+    )
 
     proc0_print(time.time() - start_time, "\nQuantities before reduction:\n")
     for n in names:
@@ -1096,7 +1123,7 @@ def create_features_20241011_01(n_data=None, mpi=False, dataset="20241005"):
         time.time() - start_time,
         "Number of features before dropping nearly constant features:",
         extracted_features.shape[1],
-        flush=True
+        flush=True,
     )
     check_for_NaNs(extracted_features)
 
@@ -1130,6 +1157,137 @@ def create_features_20241011_01(n_data=None, mpi=False, dataset="20241005"):
         features.to_pickle(filename + ".pkl")
 
         return features
+
+
+def unary_funcs_20241119(index, arr_in, name_in, powers=[-1, 2], return_n_unary=False):
+    # In the future we could also add np.roll by various amounts, or shifts
+    # before Heaviside/ReLU.
+
+    # The indefinite integral is another option, but the choice of
+    # which z to start at breaks translation invariance.
+    if return_n_unary:
+        return 7 + len(powers)
+
+    power_strings = {
+        -1: "⁻¹",
+        2: "²",
+    }
+    if index == 0:
+        # Identity
+        arr_out = arr_in
+        name_out = name_in
+    elif index == 1:
+        # Absolute value
+        arr_out = np.abs(arr_in)
+        name_out = f"|{name_in}|"
+    elif index == 2:
+        # Derivative
+        arr_out = differentiate(arr_in)
+        name_out = f"∂({name_in})"
+    elif index == 3:
+        arr_out = np.heaviside(arr_in, 0)
+        name_out = f"Heaviside({name_in})"
+    elif index == 4:
+        arr_out = np.heaviside(-arr_in, 0)
+        name_out = f"Heaviside(-{name_in})"
+    elif index == 5:
+        arr_out = np.where(arr_in > 0, arr_in, 0)
+        name_out = f"ReLU({name_in})"
+    elif index == 6:
+        arr_out = np.where(-arr_in > 0, -arr_in, 0)
+        name_out = f"ReLU(-{name_in})"
+    elif index > 6 and index < 7 + len(powers):
+        power = powers[index - 7]
+        arr_out = arr_in**power
+        name_out = f"({name_in}){power_strings[power]}"
+    else:
+        raise RuntimeError("Should not get here")
+
+    return arr_out, name_out
+
+
+def compute_fn_20241119(data, mpi_rank, mpi_size, evaluator):
+    z_functions = data["z_functions"]
+    feature_tensor = data["feature_tensor"]
+    scalars = data["scalars"]
+    scalar_feature_matrix = data["scalar_feature_matrix"]
+    z_functions = meaningful_names(z_functions)
+
+    n_scalars = len(scalars)
+    n_data, n_z, n_quantities = feature_tensor.shape
+
+    reductions_func = reductions_20241108
+    n_reductions = reductions_func(1, 1, return_n_reductions=True)
+
+    unary_func = unary_funcs_20241119
+    n_unary = unary_func(None, None, None, return_n_unary=True)
+
+    index = 0
+    bmag = feature_tensor[:, :, index]
+    assert z_functions[index] == "B"
+
+    # Add local shear as a feature:
+    F, F_names = add_local_shear(feature_tensor, z_functions, include_integral=False)
+    n_F = len(F_names)
+
+    # Explicitly store U(F) for convenience.
+    n_U_F = n_unary * n_F
+    U_F = np.zeros((n_data, n_z, n_U_F))
+    U_F_names = []
+    for j_unary in range(n_unary):
+        for j_F in range(n_F):
+            index = j_unary * n_F + j_F
+            arr, name = unary_func(j_unary, F[:, :, j_F], F_names[j_F])
+            U_F_names.append(name)
+            U_F[:, :, index] = arr
+
+    if mpi_rank == 0:
+        print("names after adding local shear:", F_names)
+        print("n_F:", n_F)
+        print("n_unary:", n_unary)
+        print("n_U_F:", n_U_F)
+        print("n_reductions:", n_reductions)
+        print("n_scalars:", n_scalars)
+        print(flush=True)
+
+    index = 0
+    # Try all the extra scalar features first:
+    for j in range(n_scalars):
+        evaluator(scalar_feature_matrix[:, j], scalars[j], index)
+        index += 1
+
+    # Now the main features:
+
+    # Tuples are (exponent, string)
+    # extra_powers_of_B = [(0, ""), (-1, " / B"), (-2, " / B²")]
+    extra_powers_of_B = [(0, ""), (-1, " / B")]
+    for extra_power_of_B, extra_power_of_B_str in extra_powers_of_B:
+        for j_outer_unary in range(n_unary):
+            for j_combos_1 in range(n_U_F):
+                for j_combos_2 in range(-1, j_combos_1 + 1):
+                    # j_combos_2 = -1 means just use j_combos_1 without a product
+                    if j_combos_2 == -1:
+                        C_U_F = U_F[:, :, j_combos_1]
+                        C_U_F_name = U_F_names[j_combos_1]
+                    else:
+                        C_U_F = U_F[:, :, j_combos_1] * U_F[:, :, j_combos_2]
+                        C_U_F_name = f"{U_F_names[j_combos_1]} {U_F_names[j_combos_2]}"
+
+                    U_C_U_F, U_C_U_F_name = unary_func(j_outer_unary, C_U_F, C_U_F_name)
+                    B_U_C_U_F = U_C_U_F * bmag**extra_power_of_B
+                    B_U_C_U_F_name = f"{U_C_U_F_name}{extra_power_of_B_str}"
+                    for j_reduction in range(n_reductions):
+                        if index % mpi_size == mpi_rank:
+                            # Only evaluate if this proc needs to:
+
+                            reduction, reduction_name = reductions_func(
+                                B_U_C_U_F, j_reduction
+                            )
+                            final_name = f"{reduction_name}({B_U_C_U_F_name})"
+                            print(final_name)
+                            evaluator(reduction, final_name, index)
+
+                        index += 1
 
 
 def create_test_features():
