@@ -50,11 +50,10 @@ def compute_mean_k_parallel(data, names, include_argmax=False):
 
     data_hat_abs = np.abs(data_hat)
     del data_hat  # Free up memory
-    mean_k_parallel = np.sum(k_parallel[None, :, None] * data_hat_abs, axis=1) / np.sum(
-        data_hat_abs, axis=1
-    )
+    denominator = np.maximum(np.sum(data_hat_abs, axis=1), -1)  # The -1 protects against division by 0.
+    mean_k_parallel = np.sum(k_parallel[None, :, None] * data_hat_abs, axis=1) / denominator
 
-    # Handle the case in which data_hat_abs is all zero, so we just divided by 0.
+    # Handle the case in which data_hat_abs is all zero, so we just would have divided by 0.
     for j in range(n_quantities):
         sum_abs_data_hat = np.sum(data_hat_abs[:, :, j], axis=1) < 1e-13
         n_zeros = np.sum(sum_abs_data_hat)
