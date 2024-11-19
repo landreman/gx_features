@@ -487,7 +487,7 @@ def try_every_feature(estimator, compute_fn, data, Y, fixed_features=None, verbo
             k = permutation[j]
             print(f"feature {j:2}  R²={scores[k]:6.3g} {names[k]}")
 
-        print("Number of features examined:", len(names))
+        print("Number of features examined:", len(names), flush=True)
 
     results = {
         "names": names,
@@ -504,7 +504,7 @@ def try_every_feature(estimator, compute_fn, data, Y, fixed_features=None, verbo
     return results
 
 
-def sfs(estimator, compute_fn, data, Y, n_steps, fixed_features=None, verbose=2):
+def sfs(estimator, compute_fn, data, Y, n_steps, fixed_features=None, verbose=1):
     if fixed_features is None:
         fixed_features = np.zeros((data["Y"].shape[0], 0))
     accumulated_features = fixed_features.copy()
@@ -521,7 +521,8 @@ def sfs(estimator, compute_fn, data, Y, n_steps, fixed_features=None, verbose=2)
     for j_step in range(n_steps):
         if verbose > 0 and proc0:
             print(
-                f"\n############### Sequential feature selection step {j_step + 1} of {n_steps} ###############"
+                f"\n############### Sequential feature selection step {j_step + 1} of {n_steps} ###############",
+                flush=True,
             )
 
         step_results = try_every_feature(
