@@ -1,13 +1,18 @@
 import unittest
 import numpy as np
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+import xgboost as xgb
 
 from gx_features.calculations import compute_reductions
 from gx_features.io import load_tensor, load_all
 from gx_features.sequential_feature_selection import (
     compute_features_20241107,
+    compute_fn_20241107,
     compute_fn_20241108,
     compute_fn_20241115,
     reductions_20241108,
+    try_every_feature,
     sfs,
 )
 
@@ -36,7 +41,7 @@ class DummyEstimator:
 
 
 class Tests(unittest.TestCase):
-    def test_small_sfs_mpi(self):
+    def test_small_try_every_feature_mpi(self):
         results = compute_features_20241107()
 
         if results is not None:
@@ -148,23 +153,105 @@ class Tests(unittest.TestCase):
                     extracted_feature_2,
                 )
 
-    def test_sfs_20241108_mpi(self):
+    def test_try_every_feature_fixed_features_mpi(self):
+        data = load_all("20241005 small")
+        Y = data["Y"]
+
+        estimator = make_pipeline(StandardScaler(), xgb.XGBRegressor(n_jobs=1))
+        from mpi4py import MPI
+
+        # Try one fixed feature:
+        index = 6
+        fixed_feature = np.var(data["feature_tensor"][:, :, index], axis=1)
+        results = try_every_feature(
+            estimator,
+            compute_fn_20241107,
+            data,
+            Y,
+            fixed_features=fixed_feature.reshape((-1, 1)),
+            verbose=1,
+        )
+        if MPI.COMM_WORLD.Get_rank() == 0:
+            np.testing.assert_allclose(results["best_score"], 0.1272051692008972)
+            np.testing.assert_equal(results["best_feature_name"], "max(gds2)")
+
+        # Try two fixed features:
+        fixed_features = np.var(data["feature_tensor"][:, :, 5:6], axis=1)
+        results = try_every_feature(
+            estimator,
+            compute_fn_20241107,
+            data,
+            Y,
+            fixed_features=fixed_features,
+            verbose=1,
+        )
+        if MPI.COMM_WORLD.Get_rank() == 0:
+            np.testing.assert_allclose(results["best_score"], -0.19673858880996703)
+            np.testing.assert_equal(
+                results["best_feature_name"], "max(gds22_over_shat_squared)"
+            )
+
+    def test_try_every_feature_20241108_mpi(self):
         data = load_all("20241005 small")
         Y = data["Y"]
 
         estimator = DummyEstimator(n_features=1)
 
-        results = sfs(estimator, compute_fn_20241108, data, Y, verbose=1)
+        results = try_every_feature(estimator, compute_fn_20241108, data, Y, verbose=1)
         from mpi4py import MPI
 
         if MPI.COMM_WORLD.Get_rank() == 0:
             np.testing.assert_equal(len(results["names"]), 57270)
 
     @unittest.skip
-    def test_sfs_20241115_mpi(self):
+    def test_try_every_feature_20241115_mpi(self):
         data = load_all("20241005 small")
         Y = data["Y"]
 
         estimator = DummyEstimator(n_features=1)
 
-        results = sfs(estimator, compute_fn_20241115, data, Y, verbose=1)
+        results = try_every_feature(estimator, compute_fn_20241115, data, Y, verbose=1)
+
+    def test_sfs_matches_try_every_feature_mpi(self):
+        data = load_all("20241005 small")
+        Y = data["Y"]
+
+        estimator = make_pipeline(StandardScaler(), xgb.XGBRegressor(n_jobs=1))
+        from mpi4py import MPI
+
+        proc0 = MPI.COMM_WORLD.Get_rank() == 0
+
+        n_steps = 3
+        sfs_results = sfs(estimator, compute_fn_20241107, data, Y, n_steps, verbose=1)
+
+        fixed_features = None
+        for j_step in range(n_steps):
+            single_feature_results = try_every_feature(
+                estimator,
+                compute_fn_20241107,
+                data,
+                Y,
+                fixed_features=fixed_features,
+                verbose=1,
+            )
+            if proc0:
+                for key in single_feature_results.keys():
+                    print(
+                        "Comparing",
+                        key,
+                        single_feature_results[key],
+                        sfs_results[j_step][key],
+                    )
+                    np.testing.assert_equal(
+                        single_feature_results[key], sfs_results[j_step][key]
+                    )
+
+                most_recent_best_feature = single_feature_results[
+                    "best_feature"
+                ].reshape((-1, 1))
+                if j_step == 0:
+                    fixed_features = most_recent_best_feature
+                else:
+                    fixed_features = np.hstack(
+                        [fixed_features, most_recent_best_feature]
+                    )

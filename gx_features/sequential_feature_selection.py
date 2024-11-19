@@ -315,21 +315,15 @@ def compute_fn_20241115(data, mpi_rank, mpi_size, evaluator):
                 activation_function_name = f"sigmoid{threshold:.2f}"
             elif j_activation_function == 2:
                 alpha = 0.05
-                activation_function = alpha + (1 - alpha) * np.heaviside(
-                    x, 0
-                )
+                activation_function = alpha + (1 - alpha) * np.heaviside(x, 0)
                 activation_function_name = f"leakyHeaviside{alpha:.2f}_{threshold:.2f}"
             elif j_activation_function == 3:
                 alpha = 0.1
-                activation_function = alpha + (1 - alpha) * np.heaviside(
-                    x, 0
-                )
+                activation_function = alpha + (1 - alpha) * np.heaviside(x, 0)
                 activation_function_name = f"leakyHeaviside{alpha:.2f}_{threshold:.2f}"
             elif j_activation_function == 4:
                 alpha = 0.2
-                activation_function = alpha + (1 - alpha) * np.heaviside(
-                    x, 0
-                )
+                activation_function = alpha + (1 - alpha) * np.heaviside(x, 0)
                 activation_function_name = f"leakyHeaviside{alpha:.2f}_{threshold:.2f}"
             else:
                 raise RuntimeError("Should not get here")
@@ -370,12 +364,15 @@ def compute_features_20241107():
 
     estimator = make_pipeline(StandardScaler(), xgb.XGBRegressor(n_jobs=1))
 
-    results = sfs(estimator, compute_fn_20241107, data, Y)
+    results = try_every_feature(estimator, compute_fn_20241107, data, Y)
     return results
 
 
-def sfs(estimator, compute_fn, data, Y, verbose=2):
+def try_every_feature(estimator, compute_fn, data, Y, fixed_features=None, verbose=2):
     # To do later: >1 feature, fixed_features, possibly backtracking?
+
+    if fixed_features is not None:
+        assert fixed_features.ndim == 2
 
     from mpi4py import MPI
 
@@ -383,6 +380,9 @@ def sfs(estimator, compute_fn, data, Y, verbose=2):
     mpi_rank = comm.Get_rank()
     mpi_size = comm.Get_size()
     proc0 = mpi_rank == 0
+
+    # Make sure all procs have the same fixed_features:
+    fixed_features = comm.bcast(fixed_features, root=0)
 
     local_names = []
     local_scores = []
@@ -401,8 +401,12 @@ def sfs(estimator, compute_fn, data, Y, verbose=2):
         if index % mpi_size != mpi_rank:
             return
 
+        X = feature.reshape((-1, 1))
+        if fixed_features is not None:
+            X = np.concatenate([fixed_features, X], axis=1)
+
         # Specify a cv because otherwise the default is to have shuffle=False:
-        score_arr = cross_val_score(estimator, feature.reshape((-1, 1)), Y, cv=cv)
+        score_arr = cross_val_score(estimator, X, Y, cv=cv)
         score = score_arr.mean()
         local_names.append(name)
         local_scores.append(score)
@@ -481,7 +485,7 @@ def sfs(estimator, compute_fn, data, Y, verbose=2):
         n_features_to_print = min(30, len(names))
         for j in range(n_features_to_print):
             k = permutation[j]
-            print(f"feature {j:2}  R2={scores[k]:6.3g} {names[k]}")
+            print(f"feature {j:2}  R²={scores[k]:6.3g} {names[k]}")
 
         print("Number of features examined:", len(names))
 
@@ -497,4 +501,53 @@ def sfs(estimator, compute_fn, data, Y, verbose=2):
         "best_feature_indices": best_feature_indices,
         "best_scores": best_scores,
     }
+    return results
+
+
+def sfs(estimator, compute_fn, data, Y, n_steps, fixed_features=None, verbose=2):
+    if fixed_features is None:
+        fixed_features = np.zeros((data["Y"].shape[0], 0))
+    accumulated_features = fixed_features.copy()
+
+    from mpi4py import MPI
+
+    comm = MPI.COMM_WORLD
+    mpi_rank = comm.Get_rank()
+    proc0 = mpi_rank == 0
+
+    results = {"n_steps": n_steps}
+    best_feature_names = []
+    R2s = np.zeros(n_steps)
+    for j_step in range(n_steps):
+        if verbose > 0 and proc0:
+            print(
+                f"\n############### Sequential feature selection step {j_step + 1} of {n_steps} ###############"
+            )
+
+        step_results = try_every_feature(
+            estimator, compute_fn, data, Y, accumulated_features, verbose=verbose
+        )
+        if proc0:
+            best_feature = step_results["best_feature"]
+            accumulated_features = np.concatenate(
+                [accumulated_features, best_feature.reshape((-1, 1))], axis=1
+            )
+            step_results["accumulated_features"] = accumulated_features
+            results[j_step] = step_results
+            best_feature_names.append(step_results["best_feature_name"])
+            R2s[j_step] = step_results["best_score"]
+
+    results["best_feature_names"] = best_feature_names
+    results["R2s"] = R2s
+
+    if verbose > 0 and proc0:
+        print(
+            "\n############### Results of sequential feature selection: ###############"
+        )
+        for j_step in range(n_steps):
+            print(
+                f"Step {j_step}  R²={results[j_step]['best_score']:6.3g}  {results[j_step]['best_feature_name']}",
+                flush=True,
+            )
+
     return results
