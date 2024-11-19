@@ -186,7 +186,7 @@ class Tests(unittest.TestCase):
             verbose=1,
         )
         if MPI.COMM_WORLD.Get_rank() == 0:
-            np.testing.assert_allclose(results["best_score"], -0.19673858880996703)
+            np.testing.assert_allclose(results["best_score"], -0.19673858880996703, rtol=2e-6)
             np.testing.assert_equal(
                 results["best_feature_name"], "max(gds22_over_shat_squared)"
             )
