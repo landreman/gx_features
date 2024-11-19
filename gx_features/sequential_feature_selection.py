@@ -21,7 +21,7 @@ from .combinations import (
     heaviside_transformations,
 )
 from .io import load_all
-from .utils import simplify_names
+from .utils import simplify_names, meaningful_names
 
 
 def reductions_20241107(arr, j):
@@ -145,7 +145,7 @@ def compute_fn_20241108(data, mpi_rank, mpi_size, evaluator):
     feature_tensor = data["feature_tensor"]
     scalars = data["scalars"]
     scalar_feature_matrix = data["scalar_feature_matrix"]
-    z_functions = simplify_names(z_functions)
+    z_functions = meaningful_names(z_functions)
 
     reductions_func = reductions_20241108
     n_reductions = reductions_func(1, 1, return_n_reductions=True)
@@ -164,10 +164,10 @@ def compute_fn_20241108(data, mpi_rank, mpi_size, evaluator):
     n_z_functions = len(F_names)
     del inverse_tensor  # Free up memory
 
-    M, M_names = heaviside_transformations(F, F_names)
+    M, M_names = heaviside_transformations(F, F_names, long_names=True)
     identity_tensor = np.ones((F.shape[0], F.shape[1], 1))
     M, _ = combine_tensors(identity_tensor, [""], M, M_names)
-    M_names = [""] + ["_" + n for n in M_names]
+    M_names = [""] + [n + " " for n in M_names]
     n_masks = len(M_names)
     print(f"n_masks: {n_masks}  M_names: {M_names}")
 
@@ -176,7 +176,7 @@ def compute_fn_20241108(data, mpi_rank, mpi_size, evaluator):
     for include_extra_oneOverB in [False, True]:
         if include_extra_oneOverB:
             maybe_1_over_B = oneOverB
-            maybe_1_over_B_name = "_/_B"
+            maybe_1_over_B_name = " / B"
             first_z_function_index = 1  # Don't include B / B
         else:
             maybe_1_over_B = np.ones_like(oneOverB)
@@ -196,7 +196,7 @@ def compute_fn_20241108(data, mpi_rank, mpi_size, evaluator):
                             data = (
                                 M[:, :, j_mask] * F[:, :, j_z_function] * maybe_1_over_B
                             )
-                            z_function_name = f"{F_names[j_z_function]}{maybe_1_over_B_name}{M_names[j_mask]}"
+                            z_function_name = f"{M_names[j_mask]}{F_names[j_z_function]}{maybe_1_over_B_name}"
 
                         reduction, reduction_name = reductions_func(data, j_reduction)
                         evaluator(
@@ -230,7 +230,7 @@ def compute_fn_20241108(data, mpi_rank, mpi_size, evaluator):
                                     * F[:, :, j_z_function2]
                                     * maybe_1_over_B
                                 )
-                                z_function_name = f"{name1}_x_{name2}{maybe_1_over_B_name}{M_names[j_mask]}"
+                                z_function_name = f"{M_names[j_mask]}{name1} {name2}{maybe_1_over_B_name}"
 
                             reduction, reduction_name = reductions_func(
                                 data, j_reduction
@@ -256,7 +256,7 @@ def compute_fn_20241115(data, mpi_rank, mpi_size, evaluator):
     """
     z_functions = data["z_functions"]
     feature_tensor = data["feature_tensor"]
-    z_functions = simplify_names(z_functions)
+    z_functions = meaningful_names(z_functions)
 
     reductions_func = reductions_20241108
     n_reductions = reductions_func(1, 1, return_n_reductions=True)

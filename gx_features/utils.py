@@ -106,3 +106,23 @@ def simplify_names(names):
         )
         simplified_names.append(simplified_name)
     return simplified_names
+
+def meaningful_names(names):
+    """
+    Given a list of GX variable names, return the names in regular physics notation.
+    """
+    new_names = []
+    for n in names:
+        # Note that gbdrift0 must come before gbdrift, and gds21 & gds22 must
+        # come before gds2.
+        n = n.replace("bmag", "B")
+        n = n.replace("gbdrift0_over_shat", "B⁻³𝗕×∇B⋅∇x")
+        n = n.replace("gbdrift", "B⁻³𝗕×∇B⋅∇y")
+        n = n.replace("cvdrift", "B⁻²𝗕×κ⋅∇y")
+        n = n.replace("gds21_over_shat", "∇x⋅∇y")
+        n = n.replace("gds22_over_shat_squared", "|∇x|²")
+        n = n.replace("gds2", "|∇y|²")
+        n = n.replace("localShear", "S")
+        new_names.append(n)
+
+    return new_names

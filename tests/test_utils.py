@@ -8,6 +8,7 @@ from gx_features.utils import (
     make_test_dataframe,
     drop_nearly_constant_features,
     drop_special_characters_from_column_names,
+    meaningful_names,
 )
 
 
@@ -78,3 +79,11 @@ class Tests(unittest.TestCase):
         assert (
             features_columns[-1] != features2_columns[-1]
         )  # Last feature name should have been changed.
+
+    def test_meaningful_names(self):
+        _, names, _ = load_tensor("test")
+        new_names = meaningful_names(names)
+        np.testing.assert_equal(
+            new_names,
+            ['B', 'B⁻³𝗕×∇B⋅∇y', 'B⁻²𝗕×κ⋅∇y', 'B⁻³𝗕×∇B⋅∇x', '|∇y|²', '∇x⋅∇y', '|∇x|²'],
+        )

@@ -254,7 +254,7 @@ def combine_tensors(*args):
     return combined_tensor, combined_names
 
 
-def heaviside_transformations(tensor, names):
+def heaviside_transformations(tensor, names, long_names=False):
     """
     For every quantity x in the tensor that takes on both positive and negative
     values, create new quantities H(x) and H(-x), where H is the Heaviside step
@@ -267,8 +267,13 @@ def heaviside_transformations(tensor, names):
     for j in range(n_quantities):
         if np.any(tensor[:, :, j] > 0) and np.any(tensor[:, :, j] < 0):
             quantities_with_both_signs.append(j)
-            new_names.append(names[j] + "Pos")
-            new_names.append(names[j] + "Neg")
+            if long_names:
+                temp_name = names[j].replace("B⁻²", "").replace("B⁻³", "")
+                new_names.append("Heaviside(" + temp_name + ")")
+                new_names.append("Heaviside(-" + temp_name + ")")
+            else:
+                new_names.append(names[j] + "Pos")
+                new_names.append(names[j] + "Neg")
 
     n_quantities_with_both_signs = len(quantities_with_both_signs)
 
