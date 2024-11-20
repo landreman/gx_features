@@ -1284,7 +1284,8 @@ def compute_fn_20241119(data, mpi_rank, mpi_size, evaluator):
                                 B_U_C_U_F, j_reduction
                             )
                             final_name = f"{reduction_name}({B_U_C_U_F_name})"
-                            print(final_name)
+                            if index % 1000 == 0:
+                                print(index, final_name)
                             evaluator(reduction, final_name, index)
 
                         index += 1

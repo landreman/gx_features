@@ -77,7 +77,7 @@ class Tests(unittest.TestCase):
             np.testing.assert_allclose(df_no_mpi.to_numpy(), df_mpi.to_numpy())
 
     @unittest.skip
-    def test_try_every_feature_20241115_mpi(self):
+    def test_compute_fn_20241119_mpi(self):
         data = load_all("20241005 small")
         Y = data["Y"]
 
