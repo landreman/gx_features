@@ -1216,7 +1216,6 @@ def compute_fn_20241119(data, mpi_rank, mpi_size, evaluator):
     feature_tensor = data["feature_tensor"]
     scalars = data["scalars"]
     scalar_feature_matrix = data["scalar_feature_matrix"]
-    z_functions = meaningful_names(z_functions)
 
     n_scalars = len(scalars)
     n_data, n_z, n_quantities = feature_tensor.shape
@@ -1229,11 +1228,12 @@ def compute_fn_20241119(data, mpi_rank, mpi_size, evaluator):
 
     index = 0
     bmag = feature_tensor[:, :, index]
-    assert z_functions[index] == "B"
+    assert z_functions[index] == "bmag"
 
     # Add local shear as a feature:
     F, F_names = add_local_shear(feature_tensor, z_functions, include_integral=False)
     n_F = len(F_names)
+    F_names = meaningful_names(F_names)
 
     # Explicitly store U(F) for convenience.
     n_U_F_original = n_unary * n_F
@@ -1306,7 +1306,7 @@ def compute_fn_20241119(data, mpi_rank, mpi_size, evaluator):
                             )
                             final_name = f"{reduction_name}({B_U_C_U_F_name})"
                             if index % 1000 == 0:
-                                print(index, final_name)
+                                print("Progress:", index, final_name, flush=True)
                             evaluator(reduction, final_name, index)
 
                         index += 1
