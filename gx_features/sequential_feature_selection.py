@@ -3,7 +3,7 @@
 
 
 import numpy as np
-from scipy.stats import skew
+from scipy.stats import skew, spearmanr
 from sklearn.model_selection import cross_val_score, KFold
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
@@ -374,6 +374,12 @@ def try_every_feature(estimator, compute_fn, data, Y, fixed_features=None, verbo
     if fixed_features is not None:
         assert fixed_features.ndim == 2
 
+    if estimator == "Spearman":
+        score_str = "C"
+        assert fixed_features is None
+    else:
+        score_str = "R²"
+
     from mpi4py import MPI
 
     comm = MPI.COMM_WORLD
@@ -401,13 +407,20 @@ def try_every_feature(estimator, compute_fn, data, Y, fixed_features=None, verbo
         if index % mpi_size != mpi_rank:
             return
 
-        X = feature.reshape((-1, 1))
-        if fixed_features is not None:
-            X = np.concatenate([fixed_features, X], axis=1)
+        if estimator == "Spearman":
+            if np.max(feature) == np.min(feature):
+                score = -1
+            else:
+                score = spearmanr(feature, Y).statistic
+        else:
+            X = feature.reshape((-1, 1))
+            if fixed_features is not None:
+                X = np.concatenate([fixed_features, X], axis=1)
 
-        # Specify a cv because otherwise the default is to have shuffle=False:
-        score_arr = cross_val_score(estimator, X, Y, cv=cv)
-        score = score_arr.mean()
+            # Specify a cv because otherwise the default is to have shuffle=False:
+            score_arr = cross_val_score(estimator, X, Y, cv=cv)
+            score = score_arr.mean()
+
         local_names.append(name)
         local_scores.append(score)
         local_indices.append(index)
@@ -485,7 +498,7 @@ def try_every_feature(estimator, compute_fn, data, Y, fixed_features=None, verbo
         n_features_to_print = min(30, len(names))
         for j in range(n_features_to_print):
             k = permutation[j]
-            print(f"feature {j:2}  R²={scores[k]:6.3g} {names[k]}")
+            print(f"feature {j:2}  {score_str}={scores[k]:6.3g} {names[k]}")
 
         print("Number of features examined:", len(names), flush=True)
 
