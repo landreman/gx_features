@@ -1203,6 +1203,11 @@ def unary_funcs_20241119(index, arr_in, name_in, powers=[-1, 2], return_n_unary=
     else:
         raise RuntimeError("Should not get here")
 
+    # If the operation doesn't do anything, and we aren't explicitly asking for
+    # the identity function, return NaN so the superfluous function is not considered.
+    if index > 0 and np.array_equal(arr_in, arr_out):
+        arr_out = np.full_like(arr_in, np.nan)
+
     return arr_out, name_out
 
 
@@ -1231,24 +1236,37 @@ def compute_fn_20241119(data, mpi_rank, mpi_size, evaluator):
     n_F = len(F_names)
 
     # Explicitly store U(F) for convenience.
-    n_U_F = n_unary * n_F
-    U_F = np.zeros((n_data, n_z, n_U_F))
+    n_U_F_original = n_unary * n_F
+    U_F = np.zeros((n_data, n_z, n_U_F_original))
     U_F_names = []
+    index = 0
     for j_unary in range(n_unary):
         for j_F in range(n_F):
-            index = j_unary * n_F + j_F
             arr, name = unary_func(j_unary, F[:, :, j_F], F_names[j_F])
-            U_F_names.append(name)
-            U_F[:, :, index] = arr
+            # Only store if there are no NaNs and the quantity is not constant.
+            if np.max(arr) > np.min(arr) and (not np.isnan(arr).any()):
+                U_F_names.append(name)
+                U_F[:, :, index] = arr
+                index += 1
+            else:
+                if mpi_rank == 0:
+                    print(f"Skipping {name} because it is constant or has NaNs")
+
+    n_U_F = index
+    U_F = U_F[:, :, :n_U_F]
 
     if mpi_rank == 0:
+        print("Any Nans?", np.any(np.isnan(U_F)))
+        print("Any infs?", np.any(np.isinf(U_F)))
         print("names after adding local shear:", F_names)
         print("n_F:", n_F)
         print("n_unary:", n_unary)
+        print("n_U_F_original:", n_U_F_original)
         print("n_U_F:", n_U_F)
         print("n_reductions:", n_reductions)
         print("n_scalars:", n_scalars)
         print(flush=True)
+    # return
 
     index = 0
     # Try all the extra scalar features first:
@@ -1261,19 +1279,22 @@ def compute_fn_20241119(data, mpi_rank, mpi_size, evaluator):
     # Tuples are (exponent, string)
     # extra_powers_of_B = [(0, ""), (-1, " / B"), (-2, " / B²")]
     extra_powers_of_B = [(0, ""), (-1, " / B")]
-    for extra_power_of_B, extra_power_of_B_str in extra_powers_of_B:
-        for j_outer_unary in range(n_unary):
-            for j_combos_1 in range(n_U_F):
-                for j_combos_2 in range(-1, j_combos_1 + 1):
-                    # j_combos_2 = -1 means just use j_combos_1 without a product
-                    if j_combos_2 == -1:
-                        C_U_F = U_F[:, :, j_combos_1]
-                        C_U_F_name = U_F_names[j_combos_1]
-                    else:
-                        C_U_F = U_F[:, :, j_combos_1] * U_F[:, :, j_combos_2]
-                        C_U_F_name = f"{U_F_names[j_combos_1]} {U_F_names[j_combos_2]}"
+    for j_combos_1 in range(n_U_F):
+        for j_combos_2 in range(-1, j_combos_1 + 1):
+            # j_combos_2 = -1 means just use j_combos_1 without a product
+            if j_combos_2 == -1:
+                C_U_F = U_F[:, :, j_combos_1]
+                C_U_F_name = U_F_names[j_combos_1]
+            else:
+                C_U_F = U_F[:, :, j_combos_1] * U_F[:, :, j_combos_2]
+                C_U_F_name = f"{U_F_names[j_combos_1]} {U_F_names[j_combos_2]}"
 
-                    U_C_U_F, U_C_U_F_name = unary_func(j_outer_unary, C_U_F, C_U_F_name)
+            for j_outer_unary in range(n_unary):
+                U_C_U_F, U_C_U_F_name = unary_func(j_outer_unary, C_U_F, C_U_F_name)
+                if np.any(np.isnan(U_C_U_F)) or np.any(np.isinf(U_C_U_F)) or np.max(arr) == np.min(arr):
+                    continue
+
+                for extra_power_of_B, extra_power_of_B_str in extra_powers_of_B:
                     B_U_C_U_F = U_C_U_F * bmag**extra_power_of_B
                     B_U_C_U_F_name = f"{U_C_U_F_name}{extra_power_of_B_str}"
                     for j_reduction in range(n_reductions):
