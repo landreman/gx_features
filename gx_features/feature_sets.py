@@ -1165,8 +1165,9 @@ def unary_funcs_20241119(index, arr_in, name_in, powers=[-1, 2], return_n_unary=
 
     # The indefinite integral is another option, but the choice of
     # which z to start at breaks translation invariance.
+    n_unitary_operations_besides_powers = 7
     if return_n_unary:
-        return 7 + len(powers)
+        return n_unitary_operations_besides_powers + len(powers)
 
     power_strings = {
         -1: "⁻¹",
@@ -1196,8 +1197,11 @@ def unary_funcs_20241119(index, arr_in, name_in, powers=[-1, 2], return_n_unary=
     elif index == 6:
         arr_out = np.where(-arr_in > 0, -arr_in, 0)
         name_out = f"ReLU(-{name_in})"
-    elif index > 6 and index < 7 + len(powers):
-        power = powers[index - 7]
+    elif (
+        index >= n_unitary_operations_besides_powers
+        and index < n_unitary_operations_besides_powers + len(powers)
+    ):
+        power = powers[index - n_unitary_operations_besides_powers]
         if power < 0 and np.any(arr_in == 0):
             # Avoid division by zero
             arr_out = np.full_like(arr_in, np.nan)
@@ -1216,7 +1220,56 @@ def unary_funcs_20241119(index, arr_in, name_in, powers=[-1, 2], return_n_unary=
     return arr_out, name_out
 
 
-def compute_fn_20241119(data, mpi_rank, mpi_size, evaluator):
+def unary_funcs_20241123(index, arr_in, name_in, powers=[-1, 2], return_n_unary=False):
+    # This is a small set of unary functions, for testing.
+
+    n_unitary_operations_besides_powers = 2
+
+    if return_n_unary:
+        return n_unitary_operations_besides_powers + len(powers)
+
+    power_strings = {
+        -1: "⁻¹",
+        2: "²",
+    }
+    if index == 0:
+        # Identity
+        arr_out = arr_in
+        name_out = name_in
+    elif index == 1:
+        arr_out = np.heaviside(arr_in, 0)
+        name_out = f"Heaviside({name_in})"
+    elif (
+        index >= n_unitary_operations_besides_powers
+        and index < n_unitary_operations_besides_powers + len(powers)
+    ):
+        power = powers[index - n_unitary_operations_besides_powers]
+        if power < 0 and np.any(arr_in == 0):
+            # Avoid division by zero
+            arr_out = np.full_like(arr_in, np.nan)
+        else:
+            arr_out = arr_in**power
+
+        name_out = f"({name_in}){power_strings[power]}"
+    else:
+        raise RuntimeError("Should not get here")
+
+    # If the operation doesn't do anything, and we aren't explicitly asking for
+    # the identity function, return NaN so the superfluous function is not considered.
+    if index > 0 and np.array_equal(arr_in, arr_out):
+        arr_out = np.full_like(arr_in, np.nan)
+
+    return arr_out, name_out
+
+
+def compute_fn_20241119(
+    data,
+    mpi_rank,
+    mpi_size,
+    evaluator,
+    unary_func=unary_funcs_20241119,
+    reductions_func=reductions_20241108,
+):
     z_functions = data["z_functions"]
     feature_tensor = data["feature_tensor"]
     scalars = data["scalars"]
@@ -1225,10 +1278,8 @@ def compute_fn_20241119(data, mpi_rank, mpi_size, evaluator):
     n_scalars = len(scalars)
     n_data, n_z, n_quantities = feature_tensor.shape
 
-    reductions_func = reductions_20241108
     n_reductions = reductions_func(1, 1, return_n_reductions=True)
 
-    unary_func = unary_funcs_20241119
     n_unary = unary_func(None, None, None, return_n_unary=True)
 
     index = 0
@@ -1309,7 +1360,7 @@ def compute_fn_20241119(data, mpi_rank, mpi_size, evaluator):
                             reduction, reduction_name = reductions_func(
                                 B_U_C_U_F, j_reduction
                             )
-                            
+
                             final_name = f"{reduction_name}({B_U_C_U_F_name})"
                             if index % 1000 == 0:
                                 print("Progress:", index, final_name, flush=True)

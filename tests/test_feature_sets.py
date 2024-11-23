@@ -9,9 +9,13 @@ from gx_features.feature_sets import (
     create_features_20240906_01,
     create_features_20241011_01,
     compute_fn_20241119,
+    unary_funcs_20241123,
 )
 from gx_features.io import load_all
-from gx_features.sequential_feature_selection import try_every_feature
+from gx_features.sequential_feature_selection import (
+    try_every_feature,
+    reductions_20241107,
+)
 
 
 class DummyEstimator:
@@ -84,3 +88,23 @@ class Tests(unittest.TestCase):
         estimator = DummyEstimator(n_features=1)
 
         results = try_every_feature(estimator, compute_fn_20241119, data, Y, verbose=1)
+
+    def test_compute_fn_20241119_mini_mpi(self):
+        """Use a smaller set of unary functions and reductions to speed up the test."""
+
+        data = load_all("20241005 small")
+        Y = data["Y"]
+
+        def compute_fn_20241119_mini(data, mpi_rank, mpi_size, evaluator):
+            return compute_fn_20241119(
+                data,
+                mpi_rank,
+                mpi_size,
+                evaluator,
+                unary_func=unary_funcs_20241123,
+                reductions_func=reductions_20241107,
+            )
+
+        results = try_every_feature(
+            "Spearman", compute_fn_20241119_mini, data, Y, verbose=1
+        )

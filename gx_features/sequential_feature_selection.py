@@ -24,7 +24,10 @@ from .io import load_all
 from .utils import simplify_names, meaningful_names
 
 
-def reductions_20241107(arr, j):
+def reductions_20241107(arr, j, return_n_reductions=False):
+    if return_n_reductions:
+        return 2
+
     if j == 0:
         return arr.min(axis=1), "min"
     elif j == 1:
