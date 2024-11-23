@@ -70,7 +70,11 @@ def reductions_20241108(
         return np.var(arr, axis=1), "variance"
 
     elif j == 7:
-        return np.nan_to_num(skew(arr, axis=1, bias=False)), "skewness"
+        if np.any(np.max(arr, axis=1) - np.min(arr, axis=1) < 1e-13):
+            # skewness is not defined for a constant array
+            return np.zeros(arr.shape[0]), "skewness"
+        else:
+            return np.nan_to_num(skew(arr, axis=1, bias=False)), "skewness"
 
     elif j in range(8, 8 + n_quantiles):
         q = quantiles[j - 8]
@@ -368,7 +372,7 @@ def compute_features_20241107():
     return results
 
 
-def try_every_feature(estimator, compute_fn, data, Y, fixed_features=None, verbose=2):
+def try_every_feature(estimator, compute_fn, data, Y, fixed_features=None, verbose=1):
     # To do later: >1 feature, fixed_features, possibly backtracking?
 
     if fixed_features is not None:

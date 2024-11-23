@@ -1198,7 +1198,12 @@ def unary_funcs_20241119(index, arr_in, name_in, powers=[-1, 2], return_n_unary=
         name_out = f"ReLU(-{name_in})"
     elif index > 6 and index < 7 + len(powers):
         power = powers[index - 7]
-        arr_out = arr_in**power
+        if power < 0 and np.any(arr_in == 0):
+            # Avoid division by zero
+            arr_out = np.full_like(arr_in, np.nan)
+        else:
+            arr_out = arr_in**power
+
         name_out = f"({name_in}){power_strings[power]}"
     else:
         raise RuntimeError("Should not get here")
@@ -1291,7 +1296,7 @@ def compute_fn_20241119(data, mpi_rank, mpi_size, evaluator):
 
             for j_outer_unary in range(n_unary):
                 U_C_U_F, U_C_U_F_name = unary_func(j_outer_unary, C_U_F, C_U_F_name)
-                if np.any(np.isnan(U_C_U_F)) or np.any(np.isinf(U_C_U_F)) or np.max(arr) == np.min(arr):
+                if (not np.all(np.isfinite(U_C_U_F))) or np.max(arr) == np.min(arr):
                     continue
 
                 for extra_power_of_B, extra_power_of_B_str in extra_powers_of_B:
@@ -1304,6 +1309,7 @@ def compute_fn_20241119(data, mpi_rank, mpi_size, evaluator):
                             reduction, reduction_name = reductions_func(
                                 B_U_C_U_F, j_reduction
                             )
+                            
                             final_name = f"{reduction_name}({B_U_C_U_F_name})"
                             if index % 1000 == 0:
                                 print("Progress:", index, final_name, flush=True)

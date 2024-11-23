@@ -9,7 +9,7 @@ in_github_actions = "CI" in os.environ and os.environ['CI'].lower() in ['1', 'tr
 """Boolean indicating if we are on Matt's laptop"""
 on_laptop = os.environ["HOME"] == "/Users/mattland"
 
-def load_all(dataset):
+def load_all(dataset, verbose=True):
     this_dir = os.path.dirname(os.path.abspath(__file__))
     test_file_dir = os.path.join(this_dir, "..", "tests", "files")
     data_dir = "."
@@ -90,7 +90,8 @@ def load_all(dataset):
     Y = np.log(heat_flux_averages)
     n_data = len(heat_flux_averages)
 
-    print("in.data.keys():", in_data.keys())
+    if verbose:
+        print("in.data.keys():", in_data.keys())
     n_z = in_data["nl"]
 
     if dataset in ["test", "20240601"]:
@@ -107,9 +108,10 @@ def load_all(dataset):
     else:
         feature_tensor = in_data["tensor"]
 
-    print("n_z:", n_z)
-    print("z_functions:", in_data["z_functions"])
-    print("n_data:", n_data)
+    if verbose:
+        print("n_z:", n_z)
+        print("z_functions:", in_data["z_functions"])
+        print("n_data:", n_data)
     assert len(Y) == feature_tensor.shape[0]
 
     data = {
