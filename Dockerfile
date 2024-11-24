@@ -61,7 +61,8 @@ RUN python3 -m pip install \
     tsfresh \
     mlxtend \
     feature_engine \
-    memory_profiler
+    memory_profiler \
+    line_profiler
 
 # RUN python3 -m pip install .
 RUN python3 -m pip install git+https://github.com/landreman/gx_features.git
