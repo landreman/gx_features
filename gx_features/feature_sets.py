@@ -1348,6 +1348,16 @@ def compute_fn_20241119(
     from mpi4py import MPI
     MPI.COMM_WORLD.barrier()
 
+    j_combos_1_arr = np.zeros(n_C, dtype=np.int32)
+    j_combos_2_arr = np.zeros(n_C, dtype=np.int32)
+    index = 0
+    for j_combos_1 in range(n_U_F):
+        for j_combos_2 in range(-1, j_combos_1 + 1):
+            j_combos_1_arr[index] = j_combos_1
+            j_combos_2_arr[index] = j_combos_2
+            index += 1
+    assert index == n_C
+
     index = 0
     # Try all the extra scalar features first:
     for j in range(n_scalars):
@@ -1391,12 +1401,10 @@ def compute_fn_20241119(
                                 evaluator(reduction, final_name, index)
 
                             index += 1
-    else:
+    elif algorithm == 2:
         # algorithm 2
         if mpi_rank == 0:
             print("Using algorithm 2")
-
-        if mpi_rank == 0:
             print(
                 "n_C:",
                 n_C,
@@ -1404,15 +1412,6 @@ def compute_fn_20241119(
                 n_C // mpi_size,
                 "of these",
             )
-        j_combos_1_arr = np.zeros(n_C, dtype=np.int32)
-        j_combos_2_arr = np.zeros(n_C, dtype=np.int32)
-        index = 0
-        for j_combos_1 in range(n_U_F):
-            for j_combos_2 in range(-1, j_combos_1 + 1):
-                j_combos_1_arr[index] = j_combos_1
-                j_combos_2_arr[index] = j_combos_2
-                index += 1
-        assert index == n_C
         index_for_evaluator = (
             mpi_rank  # so the evaluator will always evaluate the cost function
         )
@@ -1462,6 +1461,72 @@ def compute_fn_20241119(
                             )
                         evaluator(reduction, final_name, index_for_evaluator)
                         index += 1
+    elif algorithm == 3:
+        # algorithm 3
+        n_outer = n_C * n_unary
+        if mpi_rank == 0:
+            print("Using algorithm 3")
+            print(
+                "n_outer:",
+                n_outer,
+                "and each proc will do",
+                n_outer // mpi_size,
+                "of these",
+            )
+        index_for_evaluator = (
+            mpi_rank  # so the evaluator will always evaluate the cost function
+        )
+
+        index = 0
+        for j_outer in range(mpi_rank, n_outer, mpi_size):
+            j_C = j_outer // n_unary
+            j_outer_unary = j_outer % n_unary
+
+            j_combos_1 = j_combos_1_arr[j_C]
+            j_combos_2 = j_combos_2_arr[j_C]
+            # j_combos_2 = -1 means just use j_combos_1 without a product
+            if j_combos_2 == -1:
+                C_U_F = U_F[:, :, j_combos_1]
+                C_U_F_name = U_F_names[j_combos_1]
+            else:
+                C_U_F = U_F[:, :, j_combos_1] * U_F[:, :, j_combos_2]
+                C_U_F_name = f"{U_F_names[j_combos_1]} {U_F_names[j_combos_2]}"
+
+            if (j_outer - mpi_rank) % (100 * mpi_size) == 0:
+                print(
+                    "rank",
+                    mpi_rank,
+                    "is starting j_outer",
+                    j_outer,
+                    "of",
+                    n_outer,
+                    C_U_F_name,
+                    flush=True,
+                )
+
+            U_C_U_F, U_C_U_F_name = unary_func(j_outer_unary, C_U_F, C_U_F_name)
+            if (not np.all(np.isfinite(U_C_U_F))) or np.max(arr) == np.min(arr):
+                continue
+
+            for extra_power_of_B, extra_power_of_B_str in extra_powers_of_B:
+                B_U_C_U_F = U_C_U_F * bmag**extra_power_of_B
+                B_U_C_U_F_name = f"{U_C_U_F_name}{extra_power_of_B_str}"
+                for j_reduction in range(n_reductions):
+                    reduction, reduction_name = reductions_func(
+                        B_U_C_U_F, j_reduction
+                    )
+
+                    final_name = f"{reduction_name}({B_U_C_U_F_name})"
+                    if index % 1000 == 0:
+                        print(
+                            f"Progress: rank {mpi_rank:4} has done {index} evals",
+                            final_name,
+                            flush=True,
+                        )
+                    evaluator(reduction, final_name, index_for_evaluator)
+                    index += 1
+    else:
+        raise ValueError("Invalid algorithm")
 
 
 def create_test_features():

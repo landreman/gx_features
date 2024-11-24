@@ -134,6 +134,17 @@ class Tests(unittest.TestCase):
                 algorithm=2,
             )
 
+        def compute_fn_20241119_algorithm_3(data, mpi_rank, mpi_size, evaluator):
+            return compute_fn_20241119(
+                data,
+                mpi_rank,
+                mpi_size,
+                evaluator,
+                unary_func=unary_funcs_20241123,
+                reductions_func=reductions_20241107,
+                algorithm=3,
+            )
+
         evaluator = "Spearman"
 
         data = load_all("20241005 small", verbose=False)
@@ -149,6 +160,12 @@ class Tests(unittest.TestCase):
             evaluator, compute_fn_20241119_algorithm_2, data, Y, verbose=1
         )
 
+        data = load_all("20241005 small", verbose=False)
+        Y = data["Y"]
+        results3 = try_every_feature(
+            evaluator, compute_fn_20241119_algorithm_3, data, Y, verbose=1
+        )
+
         from mpi4py import MPI
 
         if MPI.COMM_WORLD.Get_rank() != 0:
@@ -157,9 +174,14 @@ class Tests(unittest.TestCase):
         # The two algorithms return results in different orders, so we need to sort them before comparing.
         perm1 = np.argsort(results1["names"])
         perm2 = np.argsort(results2["names"])
+        perm3 = np.argsort(results3["names"])
         np.testing.assert_equal(results1["names"][perm1], results2["names"][perm2])
+        np.testing.assert_equal(results1["names"][perm1], results3["names"][perm3])
         np.testing.assert_allclose(
             results1["scores"][perm1], results2["scores"][perm2], rtol=1e-6
+        )
+        np.testing.assert_allclose(
+            results1["scores"][perm1], results3["scores"][perm3], rtol=1e-6
         )
 
         for key in ["best_feature", "best_feature_name", "best_score"]:
@@ -168,5 +190,7 @@ class Tests(unittest.TestCase):
                 key,
                 results1[key],
                 results2[key],
+                results3[key],
             )
             np.testing.assert_equal(results1[key], results2[key])
+            np.testing.assert_equal(results1[key], results3[key])
