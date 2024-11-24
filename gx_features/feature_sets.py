@@ -1270,6 +1270,7 @@ def compute_fn_20241119(
     unary_func=unary_funcs_20241119,
     reductions_func=reductions_20241108,
     algorithm=2,
+    n_B_powers=2,
 ):
     z_functions = data["z_functions"]
     feature_tensor = data["feature_tensor"]
@@ -1335,7 +1336,15 @@ def compute_fn_20241119(
 
     # Tuples are (exponent, string)
     # extra_powers_of_B = [(0, ""), (-1, " / B"), (-2, " / B²")]
-    extra_powers_of_B = [(0, ""), (-1, " / B")]
+    if n_B_powers == 1:
+        extra_powers_of_B = [(0, "")]
+    elif n_B_powers == 2:
+        extra_powers_of_B = [(0, ""), (-1, " / B")]
+    elif n_B_powers == 3:
+        extra_powers_of_B = [(0, ""), (-1, " / B"), (-2, " / B²")]
+    else:
+        raise ValueError("Invalid n_B_powers")
+        
 
     if algorithm == 1:
         if mpi_rank == 0:
