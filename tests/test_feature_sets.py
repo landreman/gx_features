@@ -82,7 +82,7 @@ class Tests(unittest.TestCase):
 
     @unittest.skip
     def test_compute_fn_20241119_mpi(self):
-        data = load_all("20241005 small")
+        data = load_all("20241005 small", verbose=False)
         Y = data["Y"]
 
         estimator = DummyEstimator(n_features=1)
@@ -92,7 +92,7 @@ class Tests(unittest.TestCase):
     def test_compute_fn_20241119_mini_mpi(self):
         """Use a smaller set of unary functions and reductions to speed up the test."""
 
-        data = load_all("20241005 small")
+        data = load_all("20241005 small", verbose=False)
         Y = data["Y"]
 
         def compute_fn_20241119_mini(data, mpi_rank, mpi_size, evaluator):
@@ -136,14 +136,14 @@ class Tests(unittest.TestCase):
 
         evaluator = "Spearman"
 
-        data = load_all("20241005 small")
+        data = load_all("20241005 small", verbose=False)
         Y = data["Y"]
         results1 = try_every_feature(
             evaluator, compute_fn_20241119_algorithm_1, data, Y, verbose=1
         )
 
         # Need to re-load the data since the first call to compute_fn_20241119 adds localShear to the raw features.
-        data = load_all("20241005 small")
+        data = load_all("20241005 small", verbose=False)
         Y = data["Y"]
         results2 = try_every_feature(
             evaluator, compute_fn_20241119_algorithm_2, data, Y, verbose=1

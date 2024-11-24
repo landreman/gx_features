@@ -1313,6 +1313,19 @@ def compute_fn_20241119(
     n_U_F = index
     U_F = U_F[:, :, :n_U_F]
 
+    # Tuples are (exponent, string)
+    if n_B_powers == 1:
+        extra_powers_of_B = [(0, "")]
+    elif n_B_powers == 2:
+        extra_powers_of_B = [(0, ""), (-1, " / B")]
+    elif n_B_powers == 3:
+        extra_powers_of_B = [(0, ""), (-1, " / B"), (-2, " / B²")]
+    else:
+        raise ValueError("Invalid n_B_powers")
+    
+    n_C = (n_U_F * (n_U_F + 1)) // 2 + n_U_F
+    n_total = n_C * n_unary * n_reductions * len(extra_powers_of_B) + n_scalars
+        
     if mpi_rank == 0:
         print("Any Nans?", np.any(np.isnan(U_F)))
         print("Any infs?", np.any(np.isinf(U_F)))
@@ -1323,8 +1336,17 @@ def compute_fn_20241119(
         print("n_U_F:", n_U_F)
         print("n_reductions:", n_reductions)
         print("n_scalars:", n_scalars)
+        print("n_B_powers:", n_B_powers)
+        print(
+            "Total number of features that will be evaluated:",
+            n_total,
+            flush=True,
+        )
         print(flush=True)
     # return
+
+    from mpi4py import MPI
+    MPI.COMM_WORLD.barrier()
 
     index = 0
     # Try all the extra scalar features first:
@@ -1333,18 +1355,6 @@ def compute_fn_20241119(
         index += 1
 
     # Now the main features:
-
-    # Tuples are (exponent, string)
-    # extra_powers_of_B = [(0, ""), (-1, " / B"), (-2, " / B²")]
-    if n_B_powers == 1:
-        extra_powers_of_B = [(0, "")]
-    elif n_B_powers == 2:
-        extra_powers_of_B = [(0, ""), (-1, " / B")]
-    elif n_B_powers == 3:
-        extra_powers_of_B = [(0, ""), (-1, " / B"), (-2, " / B²")]
-    else:
-        raise ValueError("Invalid n_B_powers")
-        
 
     if algorithm == 1:
         if mpi_rank == 0:
@@ -1386,35 +1396,29 @@ def compute_fn_20241119(
         if mpi_rank == 0:
             print("Using algorithm 2")
 
-        n_outer = (n_U_F * (n_U_F + 1)) // 2 + n_U_F
         if mpi_rank == 0:
             print(
-                "n_outer:",
-                n_outer,
+                "n_C:",
+                n_C,
                 "and each proc will do",
-                n_outer // mpi_size,
+                n_C // mpi_size,
                 "of these",
             )
-            print(
-                "Total number of features that will be evaluated:",
-                n_outer * n_unary * n_reductions * len(extra_powers_of_B),
-                flush=True,
-            )
-        j_combos_1_arr = np.zeros(n_outer, dtype=np.int32)
-        j_combos_2_arr = np.zeros(n_outer, dtype=np.int32)
+        j_combos_1_arr = np.zeros(n_C, dtype=np.int32)
+        j_combos_2_arr = np.zeros(n_C, dtype=np.int32)
         index = 0
         for j_combos_1 in range(n_U_F):
             for j_combos_2 in range(-1, j_combos_1 + 1):
                 j_combos_1_arr[index] = j_combos_1
                 j_combos_2_arr[index] = j_combos_2
                 index += 1
-        assert index == n_outer
+        assert index == n_C
         index_for_evaluator = (
             mpi_rank  # so the evaluator will always evaluate the cost function
         )
 
         index = 0
-        for j_outer in range(mpi_rank, n_outer, mpi_size):
+        for j_outer in range(mpi_rank, n_C, mpi_size):
             j_combos_1 = j_combos_1_arr[j_outer]
             j_combos_2 = j_combos_2_arr[j_outer]
             # j_combos_2 = -1 means just use j_combos_1 without a product
@@ -1431,7 +1435,7 @@ def compute_fn_20241119(
                     "is starting j_outer",
                     j_outer,
                     "of",
-                    n_outer,
+                    n_C,
                     C_U_F_name,
                     flush=True,
                 )
