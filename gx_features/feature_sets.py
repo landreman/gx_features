@@ -1269,6 +1269,7 @@ def compute_fn_20241119(
     evaluator,
     unary_func=unary_funcs_20241119,
     reductions_func=reductions_20241108,
+    algorithm=2,
 ):
     z_functions = data["z_functions"]
     feature_tensor = data["feature_tensor"]
@@ -1335,8 +1336,78 @@ def compute_fn_20241119(
     # Tuples are (exponent, string)
     # extra_powers_of_B = [(0, ""), (-1, " / B"), (-2, " / B²")]
     extra_powers_of_B = [(0, ""), (-1, " / B")]
-    for j_combos_1 in range(n_U_F):
-        for j_combos_2 in range(-1, j_combos_1 + 1):
+
+    if algorithm == 1:
+        if mpi_rank == 0:
+            print("Using algorithm 1")
+        for j_combos_1 in range(n_U_F):
+            for j_combos_2 in range(-1, j_combos_1 + 1):
+                # j_combos_2 = -1 means just use j_combos_1 without a product
+                if j_combos_2 == -1:
+                    C_U_F = U_F[:, :, j_combos_1]
+                    C_U_F_name = U_F_names[j_combos_1]
+                else:
+                    C_U_F = U_F[:, :, j_combos_1] * U_F[:, :, j_combos_2]
+                    C_U_F_name = f"{U_F_names[j_combos_1]} {U_F_names[j_combos_2]}"
+
+                for j_outer_unary in range(n_unary):
+                    U_C_U_F, U_C_U_F_name = unary_func(j_outer_unary, C_U_F, C_U_F_name)
+                    if (not np.all(np.isfinite(U_C_U_F))) or np.max(arr) == np.min(arr):
+                        continue
+
+                    for extra_power_of_B, extra_power_of_B_str in extra_powers_of_B:
+                        B_U_C_U_F = U_C_U_F * bmag**extra_power_of_B
+                        B_U_C_U_F_name = f"{U_C_U_F_name}{extra_power_of_B_str}"
+                        for j_reduction in range(n_reductions):
+                            if index % mpi_size == mpi_rank:
+                                # Only evaluate if this proc needs to:
+
+                                reduction, reduction_name = reductions_func(
+                                    B_U_C_U_F, j_reduction
+                                )
+
+                                final_name = f"{reduction_name}({B_U_C_U_F_name})"
+                                if index % 1000 == 0:
+                                    print("Progress:", index, final_name, flush=True)
+                                evaluator(reduction, final_name, index)
+
+                            index += 1
+    else:
+        # algorithm 2
+        if mpi_rank == 0:
+            print("Using algorithm 2")
+
+        n_outer = (n_U_F * (n_U_F + 1)) // 2 + n_U_F
+        if mpi_rank == 0:
+            print(
+                "n_outer:",
+                n_outer,
+                "and each proc will do",
+                n_outer // mpi_size,
+                "of these",
+            )
+            print(
+                "Total number of features that will be evaluated:",
+                n_outer * n_unary * n_reductions * len(extra_powers_of_B),
+                flush=True,
+            )
+        j_combos_1_arr = np.zeros(n_outer, dtype=np.int32)
+        j_combos_2_arr = np.zeros(n_outer, dtype=np.int32)
+        index = 0
+        for j_combos_1 in range(n_U_F):
+            for j_combos_2 in range(-1, j_combos_1 + 1):
+                j_combos_1_arr[index] = j_combos_1
+                j_combos_2_arr[index] = j_combos_2
+                index += 1
+        assert index == n_outer
+        index_for_evaluator = (
+            mpi_rank  # so the evaluator will always evaluate the cost function
+        )
+
+        index = 0
+        for j_outer in range(mpi_rank, n_outer, mpi_size):
+            j_combos_1 = j_combos_1_arr[j_outer]
+            j_combos_2 = j_combos_2_arr[j_outer]
             # j_combos_2 = -1 means just use j_combos_1 without a product
             if j_combos_2 == -1:
                 C_U_F = U_F[:, :, j_combos_1]
@@ -1344,6 +1415,17 @@ def compute_fn_20241119(
             else:
                 C_U_F = U_F[:, :, j_combos_1] * U_F[:, :, j_combos_2]
                 C_U_F_name = f"{U_F_names[j_combos_1]} {U_F_names[j_combos_2]}"
+            if (j_outer - mpi_rank) % (100 * mpi_size) == 0:
+                print(
+                    "rank",
+                    mpi_rank,
+                    "is starting j_outer",
+                    j_outer,
+                    "of",
+                    n_outer,
+                    C_U_F_name,
+                    flush=True,
+                )
 
             for j_outer_unary in range(n_unary):
                 U_C_U_F, U_C_U_F_name = unary_func(j_outer_unary, C_U_F, C_U_F_name)
@@ -1354,18 +1436,18 @@ def compute_fn_20241119(
                     B_U_C_U_F = U_C_U_F * bmag**extra_power_of_B
                     B_U_C_U_F_name = f"{U_C_U_F_name}{extra_power_of_B_str}"
                     for j_reduction in range(n_reductions):
-                        if index % mpi_size == mpi_rank:
-                            # Only evaluate if this proc needs to:
+                        reduction, reduction_name = reductions_func(
+                            B_U_C_U_F, j_reduction
+                        )
 
-                            reduction, reduction_name = reductions_func(
-                                B_U_C_U_F, j_reduction
+                        final_name = f"{reduction_name}({B_U_C_U_F_name})"
+                        if index % 1000 == 0:
+                            print(
+                                f"Progress: rank {mpi_rank:4} has done {index} evals",
+                                final_name,
+                                flush=True,
                             )
-
-                            final_name = f"{reduction_name}({B_U_C_U_F_name})"
-                            if index % 1000 == 0:
-                                print("Progress:", index, final_name, flush=True)
-                            evaluator(reduction, final_name, index)
-
+                        evaluator(reduction, final_name, index_for_evaluator)
                         index += 1
 
 
