@@ -77,6 +77,39 @@ def load_all(dataset, verbose=True):
             data_dir,
             "20241103-01-random_stellarator_equilibria_finiteBeta_randomAspect_allNFP_GX_results_combined.pkl",
         )
+    elif dataset == "20241115 heliotrons only":
+        # File with the flux tube geometries (raw features):
+        in_filename = os.path.join(
+            data_dir,
+            "20241115-01-assembleFluxTubeTensor_heliotrons_multiNfp_finiteBeta_randomAspect_nz96.pkl",
+        )
+        # File with the GX heat flux
+        out_filename = os.path.join(
+            data_dir,
+            "20241115-01-GX_for_random_heliotrons_finiteBeta_randomAspect_randomNfpUpTo8_results_combined.pkl",
+        )
+    elif dataset == "20241115 random shapes and heliotrons":
+        # File with the flux tube geometries (raw features):
+        in_filename = os.path.join(
+            data_dir,
+            "20241115-01-assembleFluxTubeTensor_random_shapes_and_heliotrons_multiNfp_finiteBeta_randomAspect_nz96.pkl",
+        )
+        # File with the GX heat flux
+        out_filename = os.path.join(
+            data_dir,
+            "20241115-01-GX_for_random_shapes_and_heliotrons_finiteBeta_randomAspect_randomNfpUpTo8_results_combined.pkl",
+        )
+    elif dataset == "20241119 small":  # First 200 configs only
+        # File with the flux tube geometries (raw features):
+        in_filename = os.path.join(
+            data_dir,
+            "20241103-01-assembleFluxTubeTensor_multiNfp_finiteBeta_randomAspect_nz96_51200tubes.pkl",
+        )
+        # File with the GX heat flux
+        out_filename = os.path.join(
+            data_dir,
+            "20241119-02-GX_for_random_equilibria_finiteBeta_randomAspect_randomGradients_nfp2_gx_results_tstart150.pkl",
+        )
     else:
         raise ValueError(f"Unknown dataset: {dataset}")
 
@@ -87,7 +120,8 @@ def load_all(dataset, verbose=True):
         out_data = pickle.load(f)
 
     heat_flux_averages = out_data["Q_avgs_without_FSA_grad_x"]
-    Y = np.log(heat_flux_averages)
+    Q = heat_flux_averages
+    Y = np.log(np.maximum(heat_flux_averages, 1e-10))
     n_data = len(heat_flux_averages)
 
     if verbose:
@@ -108,14 +142,28 @@ def load_all(dataset, verbose=True):
     else:
         feature_tensor = in_data["tensor"]
 
+    if dataset == "20241119 small":
+        feature_tensor = feature_tensor[:800, :, :]
+        in_data["scalar_feature_matrix"] = in_data["scalar_feature_matrix"][:800, :]
+
     if verbose:
         print("n_z:", n_z)
         print("z_functions:", in_data["z_functions"])
         print("n_data:", n_data)
     assert len(Y) == feature_tensor.shape[0]
 
+    if "tprims" in out_data.keys():
+        # Copy n and T gradients from out_data as additional scalar features:
+        in_data["scalars"] += ["a/LT", "a/Ln"]
+        scalar_feature_matrix = np.empty((n_data, len(in_data["scalars"])))
+        scalar_feature_matrix[:, :-2] = in_data["scalar_feature_matrix"]
+        scalar_feature_matrix[:, -2] = out_data["tprims"]
+        scalar_feature_matrix[:, -1] = out_data["fprims"]
+        in_data["scalar_feature_matrix"] = scalar_feature_matrix
+        
     data = {
         "Y": Y,
+        "Q": Q,
         "feature_tensor": feature_tensor,
         "n_z": n_z,
         "n_data": n_data,
