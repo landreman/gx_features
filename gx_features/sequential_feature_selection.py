@@ -1,7 +1,7 @@
 # This module contains functions for a custom version of forward sequential
 # feature selection which is parallelized using MPI and in which it is not necessary to store all the features.
 
-
+import time
 import numpy as np
 from scipy.stats import skew, spearmanr
 from sklearn.model_selection import cross_val_score, KFold
@@ -376,7 +376,9 @@ def compute_features_20241107():
 
 
 def try_every_feature(estimator, compute_fn, data, Y, fixed_features=None, verbose=1):
-    # To do later: >1 feature, fixed_features, possibly backtracking?
+    # To do later: backtracking?
+
+    start_time = time.time()
 
     if fixed_features is not None:
         assert fixed_features.ndim == 2
@@ -507,7 +509,8 @@ def try_every_feature(estimator, compute_fn, data, Y, fixed_features=None, verbo
             k = permutation[j]
             print(f"feature {j:2}  {score_str}={scores[k]:6.3g} {names[k]}")
 
-        print("Number of features examined:", len(names), flush=True)
+        print("Number of features examined:", len(names))
+        print("Time taken:", (time.time() - start_time) / 60, "minutes", flush=True)
 
     results = {
         "names": names,
@@ -525,6 +528,8 @@ def try_every_feature(estimator, compute_fn, data, Y, fixed_features=None, verbo
 
 
 def sfs(estimator, compute_fn, data, Y, n_steps, fixed_features=None, verbose=1):
+    start_time = time.time()
+
     if fixed_features is None:
         fixed_features = np.zeros((data["Y"].shape[0], 0))
     accumulated_features = fixed_features.copy()
@@ -540,10 +545,9 @@ def sfs(estimator, compute_fn, data, Y, n_steps, fixed_features=None, verbose=1)
     R2s = np.zeros(n_steps)
     for j_step in range(n_steps):
         if verbose > 0 and proc0:
-            print(
-                f"\n############### Sequential feature selection step {j_step + 1} of {n_steps} ###############",
-                flush=True,
-            )
+            print(f"\n############### Sequential feature selection step {j_step + 1} of {n_steps} ###############")
+            if j_step > 0:
+                print("Time since start:", (time.time() - start_time) / 60, "minutes", flush=True)
 
         step_results = try_every_feature(
             estimator, compute_fn, data, Y, accumulated_features, verbose=verbose
@@ -566,9 +570,8 @@ def sfs(estimator, compute_fn, data, Y, n_steps, fixed_features=None, verbose=1)
             "\n############### Results of sequential feature selection: ###############"
         )
         for j_step in range(n_steps):
-            print(
-                f"Step {j_step}  R²={results[j_step]['best_score']:6.3g}  {results[j_step]['best_feature_name']}",
-                flush=True,
-            )
+            print(f"Step {j_step}  R²={results[j_step]['best_score']:6.3g}  {results[j_step]['best_feature_name']}")
+
+        print("Total time taken:", (time.time() - start_time) / 60, "minutes", flush=True)
 
     return results
