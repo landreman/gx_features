@@ -109,8 +109,8 @@ class Tests(unittest.TestCase):
             "Spearman", compute_fn_20241119_mini, data, Y, verbose=1
         )
 
-    def test_compute_fn_20241119_2_algorithms_mpi(self):
-        """The two algorithms for compute_fn_20241119 should give identical answers."""
+    def test_compute_fn_20241119_3_algorithms_mpi(self):
+        """The three algorithms for compute_fn_20241119 should give identical answers."""
 
         def compute_fn_20241119_algorithm_1(data, mpi_rank, mpi_size, evaluator):
             return compute_fn_20241119(
@@ -149,19 +149,15 @@ class Tests(unittest.TestCase):
 
         data = load_all("20241005 small", verbose=False)
         Y = data["Y"]
+
         results1 = try_every_feature(
             evaluator, compute_fn_20241119_algorithm_1, data, Y, verbose=1
         )
 
-        # Need to re-load the data since the first call to compute_fn_20241119 adds localShear to the raw features.
-        data = load_all("20241005 small", verbose=False)
-        Y = data["Y"]
         results2 = try_every_feature(
             evaluator, compute_fn_20241119_algorithm_2, data, Y, verbose=1
         )
 
-        data = load_all("20241005 small", verbose=False)
-        Y = data["Y"]
         results3 = try_every_feature(
             evaluator, compute_fn_20241119_algorithm_3, data, Y, verbose=1
         )

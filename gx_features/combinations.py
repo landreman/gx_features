@@ -31,7 +31,8 @@ def add_local_shear(feature_tensor, names, include_integral=True):
     n_data, n_z, n_quantities = feature_tensor.shape
 
     n_quantities_new = n_quantities + 1
-    names += ["localShear"]
+    # Make a copy of the "names" list so that we don't modify the original list.
+    names = names.copy() + ["localShear"]
     if include_integral:
         n_quantities_new += 1
         names += ["integratedLocalShear"]
