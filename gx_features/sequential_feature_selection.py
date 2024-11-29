@@ -263,7 +263,6 @@ def compute_fn_20241115(data, mpi_rank, mpi_size, evaluator):
     """
     z_functions = data["z_functions"]
     feature_tensor = data["feature_tensor"]
-    z_functions = meaningful_names(z_functions)
 
     reductions_func = reductions_20241108
     n_reductions = reductions_func(1, 1, return_n_reductions=True)
@@ -277,12 +276,14 @@ def compute_fn_20241115(data, mpi_rank, mpi_size, evaluator):
 
     index = 6
     gds22 = feature_tensor[:, :, index]
-    assert z_functions[index] == "gds22"
+    assert z_functions[index] == "gds22_over_shat_squared"
 
     index = 0
     bmag = feature_tensor[:, :, index]
     assert z_functions[index] == "bmag"
 
+    z_functions = meaningful_names(z_functions)
+    
     n_activation_functions = 5
     thresholds = np.arange(-1, 1.05, 0.1)
     n_thresholds = len(thresholds)
