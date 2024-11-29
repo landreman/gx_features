@@ -1532,6 +1532,126 @@ def compute_fn_20241119(
     else:
         raise ValueError("Invalid algorithm")
 
+def reductions_20241129(
+    arr,
+    j,
+    return_n_reductions=False,
+):
+    """These are reductions that seem likely to turn up for the top single feature."""
+    n_reductions = 4
+    if return_n_reductions:
+        return n_reductions
+
+    if j == 0:
+        return arr.max(axis=1), "max"
+
+    elif j == 1:
+        return arr.mean(axis=1), "mean"
+
+    elif j == 2:
+        return np.sqrt(np.mean(arr**2, axis=1)), "rootMeanSquare"
+
+    elif j == 3:
+        return np.var(arr, axis=1), "variance"
+
+    else:
+        raise ValueError(f"Invalid reduction index: {j}")
+    
+def compute_fn_20241129(data, mpi_rank, mpi_size, evaluator, reductions_func=reductions_20241129):
+    """
+    Focus on just the first feature, and try quantities of the form
+
+    reduction[(Heaviside(cvdrift + thresh) + alpha * cvdrift) * gds22^power * B^power]
+
+    See create_features_20240805_01() for a similar set of features.
+    """
+    z_functions = data["z_functions"]
+    feature_tensor = data["feature_tensor"]
+
+    n_reductions = reductions_func(1, 1, return_n_reductions=True)
+
+    n_data, n_z, n_quantities = feature_tensor.shape
+
+    index = 2
+    cvdrift = feature_tensor[:, :, index]
+    assert z_functions[index] == "cvdrift"
+
+    index = 6
+    gds22 = feature_tensor[:, :, index]
+    assert z_functions[index] == "gds22_over_shat_squared"
+
+    index = 0
+    bmag = feature_tensor[:, :, index]
+    assert z_functions[index] == "bmag"
+
+    z_functions = meaningful_names(z_functions)
+
+    alphas = [0, 0.05, 0.1, 0.2]
+    n_alphas = len(alphas)
+
+    thresholds = np.arange(-0.5, 0.55, 0.1)
+    n_thresholds = len(thresholds)
+
+    powers_of_gds22 = [0.5, 1, 2]
+    n_powers_of_gds22 = len(powers_of_gds22)
+
+    powers_of_bmag = [0, -1, -1.5, -2, -2.5, -3, -3.5]
+    n_powers_of_bmag = len(powers_of_bmag)
+
+    n_total = n_alphas * n_thresholds * n_powers_of_gds22 * n_powers_of_bmag * n_reductions
+
+    if mpi_rank == 0:
+        print("n_alphas:", n_alphas)
+        print("n_thresholds:", n_thresholds)
+        print("n_powers_of_bmag:", n_powers_of_bmag)
+        print("n_powers_of_gds22:", n_powers_of_gds22)
+        print("n_reductions:", n_reductions)
+        print("Total number of features to consider:", n_total)
+        print(flush=True)
+    # return
+
+    from mpi4py import MPI
+    MPI.COMM_WORLD.barrier()
+
+    index = 0
+    for j_total in range(n_total):
+        j_reduction = j_total % n_reductions
+        j_rest = j_total // n_reductions
+
+        j_power_of_bmag = j_rest % n_powers_of_bmag
+        j_rest = j_rest // n_powers_of_bmag
+
+        j_power_of_gds22 = j_rest % n_powers_of_gds22
+        j_rest = j_rest // n_powers_of_gds22
+
+        j_threshold = j_rest % n_thresholds
+        j_rest = j_rest // n_thresholds
+
+        j_alpha = j_rest
+
+        threshold = thresholds[j_threshold]
+        alpha = alphas[j_alpha]
+        power_of_gds22 = powers_of_gds22[j_power_of_gds22]
+        power_of_bmag = powers_of_bmag[j_power_of_bmag]
+
+        data = (
+            (np.heaviside(cvdrift - threshold, 0) + alpha * cvdrift)
+            * gds22**power_of_gds22
+            * bmag**power_of_bmag
+        )
+        name = (
+            f"[Heaviside(B⁻²𝗕×κ⋅∇y - {threshold:g}) + {alpha} B⁻²𝗕×κ⋅∇y]"
+            f" |∇x|²^{power_of_gds22}"
+            f" B^{power_of_bmag}"
+        )
+        reduction, reduction_name = reductions_func(
+            data, j_reduction
+        )
+        evaluator(reduction, f"{reduction_name}({name})", index)
+
+        if j_total % 1000 == 0:
+            print(f"index: {index}  name: {name}", flush=True)
+
 
 def create_test_features():
     raw_tensor, raw_names, Y = load_tensor("test")

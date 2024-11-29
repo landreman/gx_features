@@ -9,6 +9,7 @@ from gx_features.feature_sets import (
     create_features_20240906_01,
     create_features_20241011_01,
     compute_fn_20241119,
+    compute_fn_20241129,
     unary_funcs_20241123,
 )
 from gx_features.io import load_all
@@ -190,3 +191,12 @@ class Tests(unittest.TestCase):
             )
             np.testing.assert_equal(results1[key], results2[key])
             np.testing.assert_equal(results1[key], results3[key])
+
+    def test_compute_fn_20241129_mpi(self):
+
+        data = load_all("20241005 small", verbose=False)
+        Y = data["Y"]
+
+        results = try_every_feature(
+            "Spearman", compute_fn_20241129, data, Y, verbose=1
+        )
