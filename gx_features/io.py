@@ -110,6 +110,17 @@ def load_all(dataset, verbose=True):
             data_dir,
             "20241119-02-GX_for_random_equilibria_finiteBeta_randomAspect_randomGradients_nfp2_gx_results_tstart150.pkl",
         )
+    elif dataset == "20241129 nfp2":  # 3200 configs
+        # File with the flux tube geometries (raw features):
+        in_filename = os.path.join(
+            data_dir,
+            "20241129-01-assembleFluxTubeTensor_random_shapes_nfp2Only_finiteBeta_randomAspect_nz96.pkl",
+        )
+        # File with the GX heat flux
+        out_filename = os.path.join(
+            data_dir,
+            "20241129-01-GX_for_random_gradients_nfp2_results_combined.pkl",
+        )
     else:
         raise ValueError(f"Unknown dataset: {dataset}")
 
@@ -146,12 +157,6 @@ def load_all(dataset, verbose=True):
         feature_tensor = feature_tensor[:800, :, :]
         in_data["scalar_feature_matrix"] = in_data["scalar_feature_matrix"][:800, :]
 
-    if verbose:
-        print("n_z:", n_z)
-        print("z_functions:", in_data["z_functions"])
-        print("n_data:", n_data)
-    assert len(Y) == feature_tensor.shape[0]
-
     if "tprims" in out_data.keys():
         # Copy n and T gradients from out_data as additional scalar features:
         in_data["scalars"] += ["a/LT", "a/Ln"]
@@ -161,6 +166,23 @@ def load_all(dataset, verbose=True):
         scalar_feature_matrix[:, -1] = out_data["fprims"]
         in_data["scalar_feature_matrix"] = scalar_feature_matrix
         
+    # Filter out any points with large negative Q, which are probably unphysical
+    mask = Q > -1
+    if sum(mask) < n_data and verbose:
+        print("Dropping", n_data - sum(mask), "data entries with Q < -1")
+    Q = Q[mask]
+    Y = Y[mask]
+    feature_tensor = feature_tensor[mask, :, :]
+    n_data = len(Q)
+    if "scalar_feature_matrix" in in_data.keys():
+        in_data["scalar_feature_matrix"] = in_data["scalar_feature_matrix"][mask, :]
+    
+    if verbose:
+        print("n_z:", n_z)
+        print("z_functions:", in_data["z_functions"])
+        print("n_data:", n_data)
+    assert len(Y) == feature_tensor.shape[0]
+
     data = {
         "Y": Y,
         "Q": Q,

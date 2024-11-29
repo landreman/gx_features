@@ -9,7 +9,11 @@ import matplotlib.pyplot as plt
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.feature_selection import RFE
-from tsfresh import extract_features
+try:
+    from tsfresh import extract_features
+except:
+    pass
+
 import lightgbm as lgb
 from memory_profiler import profile
 
