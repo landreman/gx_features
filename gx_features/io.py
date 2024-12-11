@@ -121,6 +121,72 @@ def load_all(dataset, verbose=True):
             data_dir,
             "20241129-01-GX_for_random_gradients_nfp2_results_combined.pkl",
         )
+    elif dataset == "20241129 all nfp":
+        # File with the flux tube geometries (raw features):
+        in_filename = os.path.join(
+            data_dir,
+            "20241129-01-assembleFluxTubeTensor_random_shapes_allNfp_finiteBeta_randomAspect_nz96.pkl",
+        )
+        # File with the GX heat flux
+        out_filename = os.path.join(
+            data_dir,
+            "20241129-01-GX_for_random_gradients_randomShapes_allNfp_results_combined.pkl",
+        )
+    elif dataset == "20241129 random shapes and heliotrons":
+        # File with the flux tube geometries (raw features):
+        in_filename = os.path.join(
+            data_dir,
+            "20241129-01-assembleFluxTubeTensor_randomShapesAndHeliotrons_finiteBeta_randomAspect_nz96_filtered.pkl",
+        )
+        # File with the GX heat flux
+        out_filename = os.path.join(
+            data_dir,
+            "20241129-01-GX_for_random_gradients_randomShapesAndHeliotrons_results_combined_filtered.pkl",
+        )
+    elif dataset == "20241210 QUASR fixed gradients":
+        # File with the flux tube geometries (raw features):
+        in_filename = os.path.join(
+            data_dir,
+            "20241122-01-assembleFluxTubeTensor_QUASR_vacuum_and_finite_beta.pkl",
+        )
+        # File with the GX heat flux
+        out_filename = os.path.join(
+            data_dir,
+            "20241210-01-GX_for_fixed_gradients_QUASR_results_combined.pkl",
+        )
+    elif dataset == "20241210 QUASR random gradients":
+        # File with the flux tube geometries (raw features):
+        in_filename = os.path.join(
+            data_dir,
+            "20241122-01-assembleFluxTubeTensor_QUASR_vacuum_and_finite_beta.pkl",
+        )
+        # File with the GX heat flux
+        out_filename = os.path.join(
+            data_dir,
+            "20241210-01-GX_for_random_gradients_QUASR_results_combined.pkl",
+        )
+    elif dataset == "20241210 all configs fixed gradients":
+        # File with the flux tube geometries (raw features):
+        in_filename = os.path.join(
+            data_dir,
+            "20241210-01-assembleFluxTubeTensor_allConfigs_filtered.pkl",
+        )
+        # File with the GX heat flux
+        out_filename = os.path.join(
+            data_dir,
+            "20241210-01-GX_results_for_fixed_gradients_allConfigs_filtered.pkl",
+        )
+    elif dataset == "20241210 all configs random gradients":
+        # File with the flux tube geometries (raw features):
+        in_filename = os.path.join(
+            data_dir,
+            "20241210-01-assembleFluxTubeTensor_allConfigs_filtered.pkl",
+        )
+        # File with the GX heat flux
+        out_filename = os.path.join(
+            data_dir,
+            "20241210-01-GX_results_for_random_gradients_allConfigs_filtered.pkl",
+        )
     else:
         raise ValueError(f"Unknown dataset: {dataset}")
 
@@ -167,9 +233,15 @@ def load_all(dataset, verbose=True):
         in_data["scalar_feature_matrix"] = scalar_feature_matrix
         
     # Filter out any points with large negative Q, which are probably unphysical
-    mask = Q > -1
-    if sum(mask) < n_data and verbose:
-        print("Dropping", n_data - sum(mask), "data entries with Q < -1")
+    max_Q = 1000
+    mask1 = np.isfinite(Q)
+    mask2 = Q > -1
+    mask3 = Q < max_Q
+    mask = np.logical_and(np.logical_and(mask1, mask2), mask3)
+    if verbose:
+        print("Dropping", n_data - sum(mask1), "data entries with Q that is not finite")
+        print("Dropping", n_data - sum(mask2), "data entries with Q < -1")
+        print("Dropping", n_data - sum(mask3), "data entries with Q >", max_Q)
     Q = Q[mask]
     Y = Y[mask]
     feature_tensor = feature_tensor[mask, :, :]
