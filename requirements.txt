@@ -2,7 +2,7 @@ numpy
 scipy
 matplotlib
 pandas
-scikit-learn
+scikit-learn<1.6
 tsfresh
 xgboost
 lightgbm
