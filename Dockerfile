@@ -54,7 +54,7 @@ RUN python3 -m pip install \
     mpi4py==3.1.6 \
     numpy \
     scipy \
-    scikit-learn<1.6 \
+    "scikit-learn<1.6" \
     matplotlib \
     pandas \
     xgboost \
