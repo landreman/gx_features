@@ -448,7 +448,7 @@ def try_every_feature(estimator, compute_fn, data, Y, fixed_features=None, verbo
 
     # Send results to proc 0:
     if not proc0:
-        comm.send(local_names, dest=0)
+        # comm.send(local_names, dest=0)
         comm.send(local_scores, dest=0)
         comm.send(local_indices, dest=0)
         comm.send(local_best_feature, dest=0)
@@ -458,7 +458,7 @@ def try_every_feature(estimator, compute_fn, data, Y, fixed_features=None, verbo
         return
 
     # Remaining tasks are done only on proc 0:
-    names = local_names
+    # names = local_names
     scores = local_scores
     indices = local_indices
     best_features = [local_best_feature]
@@ -466,7 +466,7 @@ def try_every_feature(estimator, compute_fn, data, Y, fixed_features=None, verbo
     best_feature_indices = [local_best_feature_index]
     best_scores = [local_best_score]
     for rank in range(1, mpi_size):
-        names += comm.recv(source=rank)
+        # names += comm.recv(source=rank)
         scores += comm.recv(source=rank)
         indices += comm.recv(source=rank)
         best_features.append(comm.recv(source=rank))
@@ -477,7 +477,7 @@ def try_every_feature(estimator, compute_fn, data, Y, fixed_features=None, verbo
     permutation = np.argsort(indices)
     indices = np.array(indices)[permutation]
     scores = np.array(scores)[permutation]
-    names = np.array(names)[permutation]
+    # names = np.array(names)[permutation]
 
     # Find the best feature across all ranks:
     best_rank = np.argmax(best_scores)
@@ -486,12 +486,12 @@ def try_every_feature(estimator, compute_fn, data, Y, fixed_features=None, verbo
     best_feature_index = best_feature_indices[best_rank]
     best_score = best_scores[best_rank]
 
-    if verbose > 1:
-        print(
-            "\n----- Scores of each feature in the order the features were generated -----"
-        )
-        for name, score in zip(names, scores):
-            print(f"{score:6.3f}  {name}")
+    # if verbose > 1:
+    #     print(
+    #         "\n----- Scores of each feature in the order the features were generated -----"
+    #     )
+    #     for name, score in zip(names, scores):
+    #         print(f"{score:6.3f}  {name}")
 
     if verbose > 0:
         print("\n----- Results separated by MPI rank -----")
@@ -505,16 +505,17 @@ def try_every_feature(estimator, compute_fn, data, Y, fixed_features=None, verbo
 
         print("\n----- Best features -----")
         permutation = np.argsort(-scores)
-        n_features_to_print = min(30, len(names))
+        n_features_to_print = min(30, len(scores))
         for j in range(n_features_to_print):
             k = permutation[j]
-            print(f"feature {j:2}  {score_str}={scores[k]:6.3g} {names[k]}")
+            # print(f"feature {j:2}  {score_str}={scores[k]:6.3g} {names[k]}")
+            print(f"feature {j:2}  {score_str}={scores[k]:6.3g}")
 
-        print("Number of features examined:", len(names))
+        print("Number of features examined:", len(scores))
         print("Time taken:", (time.time() - start_time) / 60, "minutes", flush=True)
 
     results = {
-        "names": names,
+        # "names": names,
         "scores": scores,
         "best_feature": best_feature,
         "best_feature_name": best_feature_name,
