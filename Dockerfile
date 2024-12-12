@@ -33,8 +33,8 @@ ENV PATH=/opt/miniconda3/bin:$PATH
 RUN python3 --version
 
 #need to install mpich in the image
-#ARG mpich=4.0.2
-ARG mpich=4.3.0b1
+ARG mpich=4.0.2
+# ARG mpich=4.3.0b1
 ARG mpich_prefix=mpich-$mpich
 
 RUN \
