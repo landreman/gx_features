@@ -1767,6 +1767,154 @@ def compute_fn_20241130(data, mpi_rank, mpi_size, evaluator, reductions_func=red
             print(f"index: {j_total}  name: {name}", flush=True)
 
 
+def compute_fn_20241211(
+    data,
+    mpi_rank, 
+    mpi_size, 
+    evaluator,
+    reductions_func = reductions_20241108,
+    n_B_powers=2,
+):
+    """
+    This is a re-implementation of compute_fn_20241108 that should be faster.
+    """
+    z_functions = data["z_functions"]
+    feature_tensor = data["feature_tensor"]
+    scalars = data["scalars"]
+    scalar_feature_matrix = data["scalar_feature_matrix"]
+    z_functions = meaningful_names(z_functions)
+    n_scalars = len(scalars)
+
+    n_reductions = reductions_func(1, 1, return_n_reductions=True)
+    print("n_reductions:", n_reductions)
+
+    Bmag = feature_tensor[:, :, 0]
+
+    # Add local shear as a feature:
+    F, F_names = add_local_shear(feature_tensor, z_functions, include_integral=False)
+    print("names after adding local shear:", F_names)
+
+    # Add inverse quantities:
+    inverse_tensor, inverse_names = make_inverse_quantities(F, F_names)
+    F, F_names = combine_tensors(F, F_names, inverse_tensor, inverse_names)
+    print("names after adding inverse quantities:", F_names)
+    n_z_functions = len(F_names)
+    del inverse_tensor  # Free up memory
+
+    M, M_names = heaviside_transformations(F, F_names, long_names=True)
+    identity_tensor = np.ones((F.shape[0], F.shape[1], 1))
+    M, _ = combine_tensors(identity_tensor, [""], M, M_names)
+    M_names = [""] + [n + " " for n in M_names]
+    n_masks = len(M_names)
+
+    # Tuples are (exponent, string)
+    if n_B_powers == 1:
+        extra_powers_of_B = [(0, "")]
+    elif n_B_powers == 2:
+        extra_powers_of_B = [(0, ""), (-1, " / B")]
+    elif n_B_powers == 3:
+        extra_powers_of_B = [(0, ""), (-1, " / B"), (-2, " / B²")]
+    else:
+        raise ValueError("Invalid n_B_powers")
+    assert n_B_powers == len(extra_powers_of_B)
+    
+    # First set n_C to an upper bound, given by including X / X pairs that will
+    # be dropped later:
+    n_C = (n_z_functions * (n_z_functions + 1)) // 2 + n_z_functions
+    j_combos_1_arr = np.zeros(n_C, dtype=np.int32)
+    j_combos_2_arr = np.zeros(n_C, dtype=np.int32)
+    index = 0
+    for j_combos_1 in range(n_z_functions):
+        for j_combos_2 in range(-1, j_combos_1 + 1):
+            # # Don't multiply a feature by its own inverse:
+            if j_combos_2 >= 0:
+                name1 = F_names[j_combos_1]
+                name2 = F_names[j_combos_2]
+                if name1 == "1/" + name2 or name2 == "1/" + name1:
+                    continue
+
+            j_combos_1_arr[index] = j_combos_1
+            j_combos_2_arr[index] = j_combos_2
+            index += 1
+    n_C = index  # Will be smaller than the original n_C because X / X was skipped above.
+
+    n_total = n_C * n_reductions * n_B_powers * n_masks + n_scalars
+        
+    if mpi_rank == 0:
+        print("names after adding local shear:", F_names)
+        print("n_z_functions:", n_z_functions)
+        print("n_C:", n_C)
+        print("n_masks:", n_masks)
+        print("n_reductions:", n_reductions)
+        print("n_B_powers:", n_B_powers)
+        print("n_scalars:", n_scalars)
+        print(
+            "Total number of features that will be evaluated:",
+            n_total,
+            flush=True,
+        )
+        print(flush=True)
+
+    from mpi4py import MPI
+    MPI.COMM_WORLD.barrier()
+
+    index = 0
+    # Try all the extra scalar features:
+    n_scalars = len(scalars)
+    for j in range(n_scalars):
+        evaluator(scalar_feature_matrix[:, j], scalars[j], index)
+        index += 1
+
+    # Now the main features:
+    index_for_evaluator = (
+        mpi_rank  # so the evaluator will always evaluate the cost function
+    )
+    for j_total in range(mpi_rank, n_total, mpi_size):
+        j_reduction = j_total % n_reductions
+        j_rest = j_total // n_reductions
+
+        j_power_of_bmag = j_rest % n_B_powers
+        j_rest = j_rest // n_B_powers
+
+        j_mask = j_rest % n_masks
+        j_rest = j_rest // n_masks
+
+        j_C = j_rest
+
+        j_z_function1 = j_combos_1_arr[j_C]
+        j_z_function2 = j_combos_2_arr[j_C]
+        name1 = F_names[j_z_function1]
+        if j_z_function2 < 0:
+            C = F[:, :, j_z_function1]
+            name = name1
+        else:
+            C = F[:, :, j_z_function1] * F[:, :, j_z_function2]
+            name2 = F_names[j_z_function2]
+            name = f"{name1} {name2}"
+
+        # Don't include B / B:
+        if j_power_of_bmag > 0 and (
+            j_z_function1 == 0 or j_z_function2 == 0
+        ):
+            continue
+
+        data = (
+            M[:, :, j_mask] * C * Bmag**extra_powers_of_B[j_power_of_bmag][0]
+        )
+        z_function_name = f"{M_names[j_mask]}{name}{extra_powers_of_B[j_power_of_bmag][1]}"
+        reduction, reduction_name = reductions_func(
+            data, j_reduction
+        )
+        final_name = f"{reduction_name}({z_function_name})"
+        evaluator(
+            reduction, final_name, index_for_evaluator
+        )
+        if j_total % 1000 == 0:
+            print(f"index: {j_total}  name: {final_name}", flush=True)
+
+        index += 1
+
+
 def create_test_features():
     raw_tensor, raw_names, Y = load_tensor("test")
     # n_data = 10, n_z = 96, n_quantities = 7

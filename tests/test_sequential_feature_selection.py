@@ -6,6 +6,7 @@ import xgboost as xgb
 
 from gx_features.calculations import compute_reductions
 from gx_features.io import load_tensor, load_all
+from gx_features.feature_sets import compute_fn_20241211
 from gx_features.sequential_feature_selection import (
     compute_features_20241107,
     compute_fn_20241107,
@@ -216,6 +217,18 @@ class Tests(unittest.TestCase):
 
         if MPI.COMM_WORLD.Get_rank() == 0:
             np.testing.assert_equal(len(results["names"]), 57270)
+
+    def test_try_every_feature_20241211_mpi(self):
+        data = load_all("20241005 small")
+        Y = data["Y"]
+
+        estimator = DummyEstimator(n_features=1)
+
+        results = try_every_feature(estimator, compute_fn_20241211, data, Y, verbose=1)
+        from mpi4py import MPI
+
+        if MPI.COMM_WORLD.Get_rank() == 0:
+            np.testing.assert_equal(len(results["names"]), 57274)
 
     @unittest.skip
     def test_try_every_feature_20241115_mpi(self):
