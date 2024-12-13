@@ -24,6 +24,46 @@ from .io import load_all
 from .utils import simplify_names, meaningful_names
 
 
+def reductions_20241106(arr, j, return_n_reductions=False):
+    """Just a single reduction, for rapid testing"""
+    if return_n_reductions:
+        return 1
+
+    if j == 0:
+        return arr.max(axis=1), "max"
+    else:
+        raise ValueError(f"Invalid reduction index: {j}")
+
+
+def compute_fn_20241106(data, mpi_rank, mpi_size, evaluator):
+    """A very small number of features, for rapid testing"""
+    z_functions = data["z_functions"]
+    feature_tensor = data["feature_tensor"]
+    scalars = data["scalars"]
+    scalar_feature_matrix = data["scalar_feature_matrix"]
+    n_z_functions = len(z_functions)
+
+    index = 0
+
+    # Apply all possible reductions to all of the original z-functions:
+    for j_z_function in range(n_z_functions):
+        z_function_data = feature_tensor[:, :, j_z_function]
+        z_function_name = z_functions[j_z_function]
+        for j_reduction in range(1):
+            if index % mpi_size == mpi_rank:
+                reduction, reduction_name = reductions_20241106(
+                    z_function_data, j_reduction
+                )
+                evaluator(reduction, f"{reduction_name}({z_function_name})", index)
+            index += 1
+
+    # Try all the extra scalar features:
+    n_scalars = len(scalars)
+    for j in range(n_scalars):
+        evaluator(scalar_feature_matrix[:, j], scalars[j], index)
+        index += 1
+        
+
 def reductions_20241107(arr, j, return_n_reductions=False):
     if return_n_reductions:
         return 2
@@ -376,7 +416,7 @@ def compute_features_20241107():
     return results
 
 
-def try_every_feature(estimator, compute_fn, data, Y, fixed_features=None, verbose=1):
+def try_every_feature(estimator, compute_fn, data, Y, fixed_features=None, verbose=1, scoring=None):
     # To do later: backtracking?
 
     start_time = time.time()
@@ -387,8 +427,13 @@ def try_every_feature(estimator, compute_fn, data, Y, fixed_features=None, verbo
     if estimator == "Spearman":
         score_str = "C"
         assert fixed_features is None
-    else:
+        assert scoring is None
+    elif scoring is None and estimator._estimator_type == "regressor":
         score_str = "R²"
+    elif scoring is None and estimator._estimator_type == "classifier":
+        score_str = "accuracy"
+    else:
+        score_str = scoring
 
     from mpi4py import MPI
 
@@ -428,7 +473,7 @@ def try_every_feature(estimator, compute_fn, data, Y, fixed_features=None, verbo
                 X = np.concatenate([fixed_features, X], axis=1)
 
             # Specify a cv because otherwise the default is to have shuffle=False:
-            score_arr = cross_val_score(estimator, X, Y, cv=cv)
+            score_arr = cross_val_score(estimator, X, Y, cv=cv, scoring=scoring)
             score = score_arr.mean()
 
         local_names.append(name)
@@ -524,11 +569,12 @@ def try_every_feature(estimator, compute_fn, data, Y, fixed_features=None, verbo
         "best_feature_names": best_feature_names,
         "best_feature_indices": best_feature_indices,
         "best_scores": best_scores,
+        "scoring": scoring,
     }
     return results
 
 
-def sfs(estimator, compute_fn, data, Y, n_steps, fixed_features=None, verbose=1):
+def sfs(estimator, compute_fn, data, Y, n_steps, fixed_features=None, verbose=1, scoring=None):
     start_time = time.time()
 
     if fixed_features is None:
@@ -551,7 +597,8 @@ def sfs(estimator, compute_fn, data, Y, n_steps, fixed_features=None, verbose=1)
                 print("Time since start:", (time.time() - start_time) / 60, "minutes", flush=True)
 
         step_results = try_every_feature(
-            estimator, compute_fn, data, Y, accumulated_features, verbose=verbose
+            estimator, compute_fn, data, Y, accumulated_features, verbose=verbose,
+            scoring=scoring,
         )
         if proc0:
             best_feature = step_results["best_feature"]

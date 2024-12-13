@@ -9,6 +9,7 @@ from gx_features.io import load_tensor, load_all
 from gx_features.feature_sets import compute_fn_20241211
 from gx_features.sequential_feature_selection import (
     compute_features_20241107,
+    compute_fn_20241106,
     compute_fn_20241107,
     compute_fn_20241108,
     compute_fn_20241115,
@@ -20,6 +21,8 @@ from gx_features.sequential_feature_selection import (
 
 class DummyEstimator:
     """Dummy estimator for testing purposes."""
+
+    _estimator_type = "regressor"
 
     def __init__(self, n_features):
         self.n_features = n_features
@@ -207,6 +210,20 @@ class Tests(unittest.TestCase):
 
         if MPI.COMM_WORLD.Get_rank() == 0:
             np.testing.assert_equal(len(results["names"]), 57270)
+
+    def test_classifier_mpi(self):
+        data = load_all("20241005 small")
+        Q = data["Q"]
+        Y = Q > np.mean(Q)
+
+        estimator = xgb.XGBClassifier(n_features=1)
+
+        results = try_every_feature(estimator, compute_fn_20241106, data, Y, verbose=1, scoring="neg_log_loss")
+        # results = try_every_feature(estimator, compute_fn_20241106, data, Y, verbose=1, scoring="roc_auc")
+        from mpi4py import MPI
+
+        if MPI.COMM_WORLD.Get_rank() == 0:
+            np.testing.assert_equal(len(results["names"]), 11)
 
     def test_try_every_feature_Spearman_mpi(self):
         data = load_all("20241005 small")
