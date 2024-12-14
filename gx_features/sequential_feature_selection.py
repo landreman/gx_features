@@ -2,6 +2,7 @@
 # feature selection which is parallelized using MPI and in which it is not necessary to store all the features.
 
 import time
+import pickle
 import numpy as np
 from scipy.stats import skew, spearmanr
 from sklearn.model_selection import cross_val_score, KFold
@@ -570,11 +571,12 @@ def try_every_feature(estimator, compute_fn, data, Y, fixed_features=None, verbo
         "best_feature_indices": best_feature_indices,
         "best_scores": best_scores,
         "scoring": scoring,
+        "score_str": score_str,
     }
     return results
 
 
-def sfs(estimator, compute_fn, data, Y, n_steps, fixed_features=None, verbose=1, scoring=None):
+def sfs(estimator, compute_fn, data, Y, n_steps, fixed_features=None, verbose=1, scoring=None, filename=None):
     start_time = time.time()
 
     if fixed_features is None:
@@ -610,16 +612,20 @@ def sfs(estimator, compute_fn, data, Y, n_steps, fixed_features=None, verbose=1,
             best_feature_names.append(step_results["best_feature_name"])
             R2s[j_step] = step_results["best_score"]
 
-    results["best_feature_names"] = best_feature_names
-    results["R2s"] = R2s
+        results["best_feature_names"] = best_feature_names
+        results["R2s"] = R2s
 
-    if verbose > 0 and proc0:
-        print(
-            "\n############### Results of sequential feature selection: ###############"
-        )
-        for j_step in range(n_steps):
-            print(f"Step {j_step}  R²={results[j_step]['best_score']:6.3g}  {results[j_step]['best_feature_name']}")
+        if verbose > 0 and proc0:
+            print(
+                "\n############### Results of sequential feature selection: ###############"
+            )
+            for k_step in range(j_step + 1):
+                print(f"Step {k_step}  {results[0]['score_str']}={results[k_step]['best_score']:6.3g}  {results[k_step]['best_feature_name']}")
 
-        print("Total time taken:", (time.time() - start_time) / 60, "minutes", flush=True)
+            print("Total time taken:", (time.time() - start_time) / 60, "minutes", flush=True)
+
+        if proc0 and filename is not None:
+            with open(filename, "wb") as f:
+                pickle.dump(results, f)
 
     return results

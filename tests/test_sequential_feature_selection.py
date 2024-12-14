@@ -266,7 +266,8 @@ class Tests(unittest.TestCase):
         proc0 = MPI.COMM_WORLD.Get_rank() == 0
 
         n_steps = 3
-        sfs_results = sfs(estimator, compute_fn_20241107, data, Y, n_steps, verbose=1)
+        filename = "temp_sfs.pkl"
+        sfs_results = sfs(estimator, compute_fn_20241107, data, Y, n_steps, verbose=1, filename=filename)
 
         fixed_features = None
         for j_step in range(n_steps):
