@@ -11,6 +11,7 @@ from gx_features.feature_sets import (
     compute_fn_20241119,
     compute_fn_20241129,
     unary_funcs_20241123,
+    compute_fn_20241214,
 )
 from gx_features.io import load_all
 from gx_features.sequential_feature_selection import (
@@ -199,4 +200,14 @@ class Tests(unittest.TestCase):
 
         results = try_every_feature(
             "Spearman", compute_fn_20241129, data, Y, verbose=1
+        )
+
+    @unittest.skip
+    def test_compute_fn_20241214_mpi(self):
+
+        data = load_all("20241005 small", verbose=False)
+        Y = data["Y"]
+
+        results = try_every_feature(
+            "Spearman", compute_fn_20241214, data, Y, verbose=1
         )

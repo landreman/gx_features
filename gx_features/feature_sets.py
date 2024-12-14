@@ -4,6 +4,7 @@ import psutil
 import time
 import gc
 import numpy as np
+from scipy.stats import skew
 from pandas import DataFrame, read_pickle
 import matplotlib.pyplot as plt
 from sklearn.pipeline import make_pipeline
@@ -1913,6 +1914,339 @@ def compute_fn_20241211(
             print(f"index: {j_total}  name: {final_name}", flush=True)
 
         index += 1
+
+
+def unary_funcs_20241214(
+    index, 
+    arr_in, 
+    name_in, 
+    bmag,
+    powers=[-1, 2], 
+    rolls=[0.03125, 0.0625, 0.125, 0.25, 0.5],
+    return_n_unary=False
+):
+    # In the future we could also add shifts before Heaviside/ReLU.
+
+    # The indefinite integral is another option, but the choice of
+    # which z to start at breaks translation invariance.
+    n_unitary_operations_besides_powers = 9
+    n_powers = len(powers)
+    n_rolls = len(rolls)
+    if return_n_unary:
+        return n_unitary_operations_besides_powers + n_powers + n_rolls, n_rolls
+
+    power_strings = {
+        -1: "⁻¹",
+        2: "²",
+    }
+    if index == 0:
+        # Identity
+        arr_out = arr_in
+        name_out = name_in
+    elif index == 1:
+        # Absolute value
+        arr_out = np.abs(arr_in)
+        name_out = f"|{name_in}|"
+    elif index == 2:
+        # Derivative
+        arr_out = differentiate(arr_in)
+        name_out = f"∂({name_in})"
+    elif index == 3:
+        arr_out = np.heaviside(arr_in, 0)
+        name_out = f"Heaviside({name_in})"
+    elif index == 4:
+        arr_out = np.heaviside(-arr_in, 0)
+        name_out = f"Heaviside(-{name_in})"
+    elif index == 5:
+        arr_out = np.where(arr_in > 0, arr_in, 0)
+        name_out = f"ReLU({name_in})"
+    elif index == 6:
+        arr_out = np.where(-arr_in > 0, -arr_in, 0)
+        name_out = f"ReLU(-{name_in})"
+    elif index == 7:
+        arr_out = arr_in * bmag
+        name_out = name_in + " B"
+    elif index == 8:
+        arr_out = arr_in / bmag
+        name_out = name_in + " B⁻¹"
+    elif (
+        index >= n_unitary_operations_besides_powers
+        and index < n_unitary_operations_besides_powers + n_powers
+    ):
+        power = powers[index - n_unitary_operations_besides_powers]
+        if power < 0 and np.any(arr_in == 0):
+            # Avoid division by zero
+            arr_out = np.full_like(arr_in, np.nan)
+        else:
+            arr_out = arr_in**power
+
+        name_out = f"({name_in}){power_strings[power]}"
+    elif (
+        index >= n_unitary_operations_besides_powers + n_powers
+        and index < n_unitary_operations_besides_powers + n_powers + n_rolls
+    ):
+        i = index - n_unitary_operations_besides_powers - n_powers
+        roll_amount = rolls[i]
+        roll_amount_int = int(roll_amount * arr_in.shape[1])
+        arr_out = np.roll(arr_in, roll_amount_int, axis=1)
+        name_out = f"roll{roll_amount}({name_in})"
+    else:
+        raise RuntimeError("Should not get here")
+
+    # If the operation doesn't do anything, and we aren't explicitly asking for
+    # the identity function, return NaN so the superfluous function is not considered.
+    if index > 0 and np.array_equal(arr_in, arr_out):
+        arr_out = np.full_like(arr_in, np.nan)
+
+    return arr_out, name_out
+
+
+def reductions_20241214(
+    arr,
+    j,
+    quantiles=[0.1, 0.25, 0.75, 0.9],
+    count_above=[-2, -1, 0, 1, 2],
+    fft_coefficients=[1, 2, 3],
+    return_n_reductions=False,
+):
+    n_quantiles = len(quantiles)
+    n_count_above = len(count_above)
+    n_fft_coefficients = len(fft_coefficients)
+    n_reductions_before_lists = 11
+    n_reductions = n_reductions_before_lists + n_quantiles + n_count_above + n_fft_coefficients
+    if return_n_reductions:
+        return n_reductions
+
+    if j == 0:
+        return arr.max(axis=1), "max"
+
+    elif j == 1:
+        return arr.min(axis=1), "min"
+
+    elif j == 2:
+        return arr.max(axis=1) - arr.min(axis=1), "maxMinusMin"
+
+    elif j == 3:
+        return arr.mean(axis=1), "mean"
+
+    elif j == 4:
+        return np.median(arr, axis=1), "median"
+
+    elif j == 5:
+        return np.sqrt(np.mean(arr**2, axis=1)), "rootMeanSquare"
+
+    elif j == 6:
+        return np.var(arr, axis=1), "variance"
+
+    elif j == 7:
+        if np.any(np.max(arr, axis=1) - np.min(arr, axis=1) < 1e-13):
+            # skewness is not defined for a constant array
+            return np.zeros(arr.shape[0]), "skewness"
+        else:
+            return np.nan_to_num(skew(arr, axis=1, bias=False)), "skewness"
+
+    elif j == 8:
+        new_features, kpar_names = compute_mean_k_parallel(
+            arr.reshape((arr.shape[0], arr.shape[1], 1)), [""], include_argmax=False
+        )
+        return new_features[:, 0], "meanKpar"
+
+    elif j == 9:
+        new_features, kpar_names = compute_mean_k_parallel(
+            arr.reshape((arr.shape[0], arr.shape[1], 1)), [""], include_argmax=True
+        )
+        return new_features[:, 1], "argmaxKpar"
+
+    elif j == 10:
+        return np.sum(np.abs(arr)), "L₁Norm"
+
+    elif j in range(n_reductions_before_lists, n_reductions_before_lists + n_quantiles):
+        q = quantiles[j - n_reductions_before_lists]
+        return np.quantile(arr, q, axis=1), f"quantile{q}"
+
+    elif j in range(n_reductions_before_lists + n_quantiles, n_reductions_before_lists + n_quantiles + n_count_above):
+        i = j - n_reductions_before_lists - n_quantiles
+        return np.mean(arr > count_above[i], axis=1), f"countAbove{count_above[i]}"
+
+    elif j in range(
+        n_reductions_before_lists + n_quantiles + n_count_above,
+        n_reductions_before_lists + n_quantiles + n_count_above + n_fft_coefficients,
+    ):
+        abs_fft_result = np.abs(np.fft.fft(arr, axis=1))
+        i = j - n_reductions_before_lists - n_quantiles - n_count_above
+        return (
+            abs_fft_result[:, fft_coefficients[i]],
+            f"absFFTCoeff{fft_coefficients[i]}",
+        )
+    
+    else:
+        raise ValueError(f"Invalid reduction index: {j}")
+
+
+def compute_fn_20241214(
+    data,
+    mpi_rank,
+    mpi_size,
+    evaluator,
+    unary_func=unary_funcs_20241214,
+    reductions_func=reductions_20241214,
+    n_B_powers=1,
+):
+    z_functions = data["z_functions"]
+    feature_tensor = data["feature_tensor"]
+    scalars = data["scalars"]
+    scalar_feature_matrix = data["scalar_feature_matrix"]
+
+    n_scalars = len(scalars)
+    n_data, n_z, n_quantities = feature_tensor.shape
+
+    n_reductions = reductions_func(1, 1, return_n_reductions=True)
+
+    n_unary, n_rolls = unary_func(None, None, None, None, return_n_unary=True)
+
+    index = 0
+    bmag = feature_tensor[:, :, index]
+    assert z_functions[index] == "bmag"
+
+    # Add local shear as a feature:
+    F, F_names = add_local_shear(feature_tensor, z_functions, include_integral=False)
+    n_F = len(F_names)
+    F_names = meaningful_names(F_names)
+
+    # Explicitly store U(F) for convenience.
+    n_U_F_original = n_unary * n_F
+    U_F = np.zeros((n_data, n_z, n_U_F_original))
+    U_F_names = []
+    index = 0
+    for j_unary in range(n_unary):
+        for j_F in range(n_F):
+            arr, name = unary_func(j_unary, F[:, :, j_F], F_names[j_F], bmag)
+            # Only store if there are no NaNs and the quantity is not constant.
+            if np.max(arr) > np.min(arr) and (not np.isnan(arr).any()):
+                U_F_names.append(name)
+                U_F[:, :, index] = arr
+                index += 1
+            else:
+                if mpi_rank == 0:
+                    print(f"Skipping {name} because it is constant or has NaNs")
+
+    n_U_F = index
+    U_F = U_F[:, :, :n_U_F]
+
+    # Tuples are (exponent, string)
+    if n_B_powers == 1:
+        extra_powers_of_B = [(0, "")]
+    elif n_B_powers == 2:
+        extra_powers_of_B = [(0, ""), (-1, " / B")]
+    elif n_B_powers == 3:
+        extra_powers_of_B = [(0, ""), (-1, " / B"), (-2, " / B²")]
+    else:
+        raise ValueError("Invalid n_B_powers")
+    
+    n_C = (n_U_F * (n_U_F + 1)) // 2 + n_U_F
+    n_total = n_C * n_unary * n_reductions * len(extra_powers_of_B) + n_scalars
+        
+    if mpi_rank == 0:
+        print("Any Nans?", np.any(np.isnan(U_F)))
+        print("Any infs?", np.any(np.isinf(U_F)))
+        print("names after adding local shear:", F_names)
+        print("n_F:", n_F)
+        print("n_unary:", n_unary)
+        print("n_U_F_original:", n_U_F_original)
+        print("n_U_F:", n_U_F)
+        print("n_reductions:", n_reductions)
+        print("n_scalars:", n_scalars)
+        print("n_B_powers:", n_B_powers)
+        print(
+            "Total number of features that will be evaluated:",
+            n_total,
+            flush=True,
+        )
+        print(flush=True)
+    # return
+
+    from mpi4py import MPI
+    MPI.COMM_WORLD.barrier()
+
+    j_combos_1_arr = np.zeros(n_C, dtype=np.int32)
+    j_combos_2_arr = np.zeros(n_C, dtype=np.int32)
+    index = 0
+    for j_combos_1 in range(n_U_F):
+        for j_combos_2 in range(-1, j_combos_1 + 1):
+            j_combos_1_arr[index] = j_combos_1
+            j_combos_2_arr[index] = j_combos_2
+            index += 1
+    assert index == n_C
+
+    index = 0
+    # Try all the extra scalar features first:
+    for j in range(n_scalars):
+        evaluator(scalar_feature_matrix[:, j], scalars[j], index)
+        index += 1
+
+    # Now the main features:
+    # algorithm 2
+    if mpi_rank == 0:
+        print("Using algorithm 2")
+        print(
+            "n_C:",
+            n_C,
+            "and each proc will do",
+            n_C // mpi_size,
+            "of these",
+        )
+    index_for_evaluator = (
+        mpi_rank  # so the evaluator will always evaluate the cost function
+    )
+
+    index = 0
+    for j_outer in range(mpi_rank, n_C, mpi_size):
+        j_combos_1 = j_combos_1_arr[j_outer]
+        j_combos_2 = j_combos_2_arr[j_outer]
+        # j_combos_2 = -1 means just use j_combos_1 without a product
+        if j_combos_2 == -1:
+            C_U_F = U_F[:, :, j_combos_1]
+            C_U_F_name = U_F_names[j_combos_1]
+        else:
+            C_U_F = U_F[:, :, j_combos_1] * U_F[:, :, j_combos_2]
+            C_U_F_name = f"{U_F_names[j_combos_1]} {U_F_names[j_combos_2]}"
+        if (j_outer - mpi_rank) % (100 * mpi_size) == 0:
+            print(
+                "rank",
+                mpi_rank,
+                "is starting j_outer",
+                j_outer,
+                "of",
+                n_C,
+                C_U_F_name,
+                flush=True,
+            )
+
+        # Don't apply a roll as the outer unary operation, since reductions
+        # aren't affected by a roll.
+        for j_outer_unary in range(n_unary - n_rolls):
+            U_C_U_F, U_C_U_F_name = unary_func(j_outer_unary, C_U_F, C_U_F_name, bmag)
+            if (not np.all(np.isfinite(U_C_U_F))) or np.max(arr) == np.min(arr):
+                continue
+
+            for extra_power_of_B, extra_power_of_B_str in extra_powers_of_B:
+                B_U_C_U_F = U_C_U_F * bmag**extra_power_of_B
+                B_U_C_U_F_name = f"{U_C_U_F_name}{extra_power_of_B_str}"
+                for j_reduction in range(n_reductions):
+                    reduction, reduction_name = reductions_func(
+                        B_U_C_U_F, j_reduction
+                    )
+
+                    final_name = f"{reduction_name}({B_U_C_U_F_name})"
+                    if index % 1000 == 0:
+                        print(
+                            f"Progress: rank {mpi_rank:4} has done {index} evals",
+                            final_name,
+                            flush=True,
+                        )
+                    evaluator(reduction, final_name, index_for_evaluator)
+                    index += 1
+ 
 
 
 def create_test_features():
