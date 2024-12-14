@@ -225,6 +225,22 @@ class Tests(unittest.TestCase):
         if MPI.COMM_WORLD.Get_rank() == 0:
             np.testing.assert_equal(len(results["names"]), 11)
 
+    def test_parsimony(self):
+        for parsimony_margin in [0, 1e-4]:
+            data = load_all("20241005 small")
+            Q = data["Q"]
+            Y = Q > np.mean(Q)
+
+            estimator = DummyEstimator(n_features=1)
+
+            results = try_every_feature(estimator, compute_fn_20241106, data, Y, verbose=1, parismony=True, parsimony_margin=parsimony_margin)
+            from mpi4py import MPI
+
+            if MPI.COMM_WORLD.Get_rank() == 0:
+                np.testing.assert_equal(len(results["names"]), 11)
+                np.testing.assert_equal(results["best_feature_name"], "nfp")
+                np.testing.assert_equal(results["best_feature_index"], 7)
+
     def test_try_every_feature_Spearman_mpi(self):
         data = load_all("20241005 small")
         Y = data["Y"]

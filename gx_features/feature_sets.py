@@ -2058,7 +2058,7 @@ def reductions_20241214(
         return new_features[:, 1], "argmaxKpar"
 
     elif j == 10:
-        return np.sum(np.abs(arr)), "L₁Norm"
+        return np.sum(np.abs(arr), axis=1), "L₁Norm"
 
     elif j in range(n_reductions_before_lists, n_reductions_before_lists + n_quantiles):
         q = quantiles[j - n_reductions_before_lists]

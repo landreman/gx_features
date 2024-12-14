@@ -245,13 +245,13 @@ def load_all(dataset, verbose=True, stride=1):
     Q = Q[mask]
     Y = Y[mask]
     feature_tensor = feature_tensor[mask, :, :]
-    n_data = len(Q)
     if "scalar_feature_matrix" in in_data.keys():
         in_data["scalar_feature_matrix"] = in_data["scalar_feature_matrix"][mask, :]
 
     # Take a subset of the data:
     Y = Y[::stride]
     Q = Q[::stride]
+    n_data = len(Q)
     feature_tensor = feature_tensor[::stride, :, :]
     if "scalar_feature_matrix" in in_data.keys():
         in_data["scalar_feature_matrix"] = in_data["scalar_feature_matrix"][::stride, :]

@@ -1,5 +1,6 @@
 import unittest
 import numpy as np
+import xgboost as xgb
 
 from gx_features.feature_sets import (
     create_tensors_20240725_01,
@@ -16,6 +17,7 @@ from gx_features.feature_sets import (
 from gx_features.io import load_all
 from gx_features.sequential_feature_selection import (
     try_every_feature,
+    sfs,
     reductions_20241107,
 )
 
@@ -208,6 +210,10 @@ class Tests(unittest.TestCase):
         data = load_all("20241005 small", verbose=False)
         Y = data["Y"]
 
-        results = try_every_feature(
-            "Spearman", compute_fn_20241214, data, Y, verbose=1
+        # results = try_every_feature(
+        #     "Spearman", compute_fn_20241214, data, Y, verbose=1
+        # )
+        n_steps = 1
+        results = sfs(
+            xgb.XGBRegressor(), compute_fn_20241214, data, Y, n_steps, verbose=1
         )

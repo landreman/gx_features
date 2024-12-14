@@ -417,10 +417,13 @@ def compute_features_20241107():
     return results
 
 
-def try_every_feature(estimator, compute_fn, data, Y, fixed_features=None, verbose=1, scoring=None):
+def try_every_feature(estimator, compute_fn, data, Y, fixed_features=None, verbose=1, scoring=None, parismony=False, parsimony_margin=1e-4):
     # To do later: backtracking?
 
     start_time = time.time()
+
+    if not parismony:
+        parsimony_margin = 0
 
     if fixed_features is not None:
         assert fixed_features.ndim == 2
@@ -483,7 +486,10 @@ def try_every_feature(estimator, compute_fn, data, Y, fixed_features=None, verbo
         if verbose > 1:
             print(f"[{mpi_rank}] index {index}: {name}, score: {score}", flush=True)
 
-        if local_best_feature is None or score > local_best_score:
+        if (local_best_feature is None 
+            or score > local_best_score + parsimony_margin
+            or (parismony and abs(score - local_best_score) <= parsimony_margin and len(name) < len(local_best_feature_name))
+        ):
             local_best_feature = feature
             local_best_feature_name = name
             local_best_feature_index = index
@@ -525,12 +531,29 @@ def try_every_feature(estimator, compute_fn, data, Y, fixed_features=None, verbo
     scores = np.array(scores)[permutation]
     names = np.array(names)[permutation]
 
-    # Find the best feature across all ranks:
-    best_rank = np.argmax(best_scores)
-    best_feature = best_features[best_rank]
-    best_feature_name = best_feature_names[best_rank]
-    best_feature_index = best_feature_indices[best_rank]
-    best_score = best_scores[best_rank]
+    best_features = np.array(best_features)
+    best_feature_names = np.array(best_feature_names)
+    best_feature_indices = np.array(best_feature_indices)
+    best_scores = np.array(best_scores)
+
+    if parismony:
+        # Find the best feature across all ranks:
+        best_score = np.max(best_scores)
+        # Find all features that are tied with the best feature:
+        mask = np.abs(best_scores - best_score) <= parsimony_margin
+        name_lengths = [len(n) for n in best_feature_names[mask]]
+        best_index_among_ties = np.argmin(name_lengths)
+
+        best_feature = best_features[mask][best_index_among_ties]
+        best_feature_name = best_feature_names[mask][best_index_among_ties]
+        best_feature_index = best_feature_indices[mask][best_index_among_ties]
+        best_score = best_scores[mask][best_index_among_ties]
+    else:
+        best_index = np.argmax(best_scores)
+        best_feature = best_features[best_index]
+        best_feature_name = best_feature_names[best_index]
+        best_feature_index = best_feature_indices[best_index]
+        best_score = best_scores[best_index]
 
     if verbose > 1:
         print(
@@ -542,7 +565,7 @@ def try_every_feature(estimator, compute_fn, data, Y, fixed_features=None, verbo
     if verbose > 0:
         print("\n----- Results separated by MPI rank -----")
         print(
-            f"best_scores: {best_scores}  best_rank: {best_rank}  best_score: {best_score}"
+            f"best_scores: {best_scores}  best_score: {best_score}"
         )
         print(f"best_feature_names: {best_feature_names}")
         print(f"best_feature_name: {best_feature_name}")
@@ -572,6 +595,8 @@ def try_every_feature(estimator, compute_fn, data, Y, fixed_features=None, verbo
         "best_scores": best_scores,
         "scoring": scoring,
         "score_str": score_str,
+        "parsimony": parismony,
+        "parsimony_margin": parsimony_margin,
     }
     return results
 
@@ -589,7 +614,7 @@ def sfs(estimator, compute_fn, data, Y, n_steps, fixed_features=None, verbose=1,
     mpi_rank = comm.Get_rank()
     proc0 = mpi_rank == 0
 
-    results = {"n_steps": n_steps}
+    results = {}
     best_feature_names = []
     R2s = np.zeros(n_steps)
     for j_step in range(n_steps):
@@ -614,6 +639,7 @@ def sfs(estimator, compute_fn, data, Y, n_steps, fixed_features=None, verbose=1,
 
         results["best_feature_names"] = best_feature_names
         results["R2s"] = R2s
+        results["n_steps"] = j_step + 1
 
         if verbose > 0 and proc0:
             print(
