@@ -233,7 +233,7 @@ class Tests(unittest.TestCase):
 
             estimator = DummyEstimator(n_features=1)
 
-            results = try_every_feature(estimator, compute_fn_20241106, data, Y, verbose=1, parismony=True, parsimony_margin=parsimony_margin)
+            results = try_every_feature(estimator, compute_fn_20241106, data, Y, verbose=1, parsimony=True, parsimony_margin=parsimony_margin)
             from mpi4py import MPI
 
             if MPI.COMM_WORLD.Get_rank() == 0:
