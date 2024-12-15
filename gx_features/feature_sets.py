@@ -1922,14 +1922,14 @@ def unary_funcs_20241214(
     name_in, 
     bmag,
     powers=[-1, 2], 
-    rolls=[0.03125, 0.0625, 0.125, 0.25, 0.5],
+    rolls=[0.03125, 0.0625, 0.125, 0.25],
     return_n_unary=False
 ):
     # In the future we could also add shifts before Heaviside/ReLU.
 
     # The indefinite integral is another option, but the choice of
     # which z to start at breaks translation invariance.
-    n_unitary_operations_besides_powers = 9
+    n_unitary_operations_besides_powers = 7
     n_powers = len(powers)
     n_rolls = len(rolls)
     if return_n_unary:
@@ -1943,30 +1943,30 @@ def unary_funcs_20241214(
         # Identity
         arr_out = arr_in
         name_out = name_in
+    # elif index == 1:
+    #     # Absolute value
+    #     arr_out = np.abs(arr_in)
+    #     name_out = f"|{name_in}|"
     elif index == 1:
-        # Absolute value
-        arr_out = np.abs(arr_in)
-        name_out = f"|{name_in}|"
-    elif index == 2:
         # Derivative
         arr_out = differentiate(arr_in)
         name_out = f"∂({name_in})"
-    elif index == 3:
+    elif index == 2:
         arr_out = np.heaviside(arr_in, 0)
         name_out = f"Heaviside({name_in})"
-    elif index == 4:
+    elif index == 3:
         arr_out = np.heaviside(-arr_in, 0)
         name_out = f"Heaviside(-{name_in})"
-    elif index == 5:
+    elif index == 4:
         arr_out = np.where(arr_in > 0, arr_in, 0)
         name_out = f"ReLU({name_in})"
-    elif index == 6:
+    elif index == 5:
         arr_out = np.where(-arr_in > 0, -arr_in, 0)
         name_out = f"ReLU(-{name_in})"
-    elif index == 7:
-        arr_out = arr_in * bmag
-        name_out = name_in + " B"
-    elif index == 8:
+    # elif index == 7:
+    #     arr_out = arr_in * bmag
+    #     name_out = name_in + " B"
+    elif index == 6:
         arr_out = arr_in / bmag
         name_out = name_in + " B⁻¹"
     elif (
@@ -2004,15 +2004,15 @@ def unary_funcs_20241214(
 def reductions_20241214(
     arr,
     j,
-    quantiles=[0.1, 0.25, 0.75, 0.9],
-    count_above=[-2, -1, 0, 1, 2],
+    quantiles=[0.1, 0.9],
+    count_above=[-2, 0, 2],
     fft_coefficients=[1, 2, 3],
     return_n_reductions=False,
 ):
     n_quantiles = len(quantiles)
     n_count_above = len(count_above)
     n_fft_coefficients = len(fft_coefficients)
-    n_reductions_before_lists = 11
+    n_reductions_before_lists = 9
     n_reductions = n_reductions_before_lists + n_quantiles + n_count_above + n_fft_coefficients
     if return_n_reductions:
         return n_reductions
@@ -2033,32 +2033,32 @@ def reductions_20241214(
         return np.median(arr, axis=1), "median"
 
     elif j == 5:
-        return np.sqrt(np.mean(arr**2, axis=1)), "rootMeanSquare"
+        return np.mean(arr**2, axis=1), "meanSquare"
 
     elif j == 6:
         return np.var(arr, axis=1), "variance"
 
-    elif j == 7:
-        if np.any(np.max(arr, axis=1) - np.min(arr, axis=1) < 1e-13):
-            # skewness is not defined for a constant array
-            return np.zeros(arr.shape[0]), "skewness"
-        else:
-            return np.nan_to_num(skew(arr, axis=1, bias=False)), "skewness"
+    # elif j == 7:
+    #     if np.any(np.max(arr, axis=1) - np.min(arr, axis=1) < 1e-13):
+    #         # skewness is not defined for a constant array
+    #         return np.zeros(arr.shape[0]), "skewness"
+    #     else:
+    #         return np.nan_to_num(skew(arr, axis=1, bias=False)), "skewness"
 
-    elif j == 8:
+    elif j == 7:
         new_features, kpar_names = compute_mean_k_parallel(
             arr.reshape((arr.shape[0], arr.shape[1], 1)), [""], include_argmax=False
         )
         return new_features[:, 0], "meanKpar"
 
-    elif j == 9:
+    elif j == 8:
         new_features, kpar_names = compute_mean_k_parallel(
             arr.reshape((arr.shape[0], arr.shape[1], 1)), [""], include_argmax=True
         )
         return new_features[:, 1], "argmaxKpar"
 
-    elif j == 10:
-        return np.sum(np.abs(arr), axis=1), "L₁Norm"
+    # elif j == 10:
+    #     return np.sum(np.abs(arr), axis=1), "L₁Norm"
 
     elif j in range(n_reductions_before_lists, n_reductions_before_lists + n_quantiles):
         q = quantiles[j - n_reductions_before_lists]
