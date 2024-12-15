@@ -2114,8 +2114,28 @@ def compute_fn_20241214(
     F_names = meaningful_names(F_names)
 
     # Explicitly store U(F) for convenience.
+    # Use MPI shared memory to store U(F) so that it can be accessed by all
+    # processes without having an independent copy for each process.
+    # Based on
+    # https://stackoverflow.com/questions/32485122/shared-memory-in-mpi4py
+    from mpi4py import MPI
+    shared_comm = MPI.COMM_WORLD.Split_type(MPI.COMM_TYPE_SHARED)
+    proc0_shared = shared_comm.Get_rank() == 0
+    print(f"shared_comm:  global rank {mpi_rank} shared rank {shared_comm.Get_rank()}", flush=True)
     n_U_F_original = n_unary * n_F
-    U_F = np.zeros((n_data, n_z, n_U_F_original))
+    shape = (n_data, n_z, n_U_F_original)
+    if proc0_shared:
+        nbytes = shape[0] * shape[1] * shape[2] * MPI.DOUBLE.Get_size()
+    else:
+        nbytes = 0
+
+    win = MPI.Win.Allocate_shared(nbytes, MPI.DOUBLE.Get_size(), comm=shared_comm)
+    buf, itemsize = win.Shared_query(0)
+    assert itemsize == MPI.DOUBLE.Get_size()
+
+    # Create a numpy array whose data points to the shared memory
+    U_F = np.ndarray(buffer=buf, dtype='d', shape=shape)
+    # U_F = np.zeros((n_data, n_z, n_U_F_original))
     U_F_names = []
     index = 0
     for j_unary in range(n_unary):
@@ -2124,12 +2144,16 @@ def compute_fn_20241214(
             # Only store if there are no NaNs and the quantity is not constant.
             if np.max(arr) > np.min(arr) and (not np.isnan(arr).any()):
                 U_F_names.append(name)
-                U_F[:, :, index] = arr
+                if proc0_shared:
+                    U_F[:, :, index] = arr
                 index += 1
             else:
                 if mpi_rank == 0:
                     print(f"Skipping {name} because it is constant or has NaNs")
 
+    shared_comm.barrier()
+    np.set_printoptions(linewidth=200)
+    print(f"global rank {mpi_rank} U_F {U_F[:2, :2, :2].flatten()}", flush=True)
     n_U_F = index
     U_F = U_F[:, :, :n_U_F]
 
@@ -2162,10 +2186,15 @@ def compute_fn_20241214(
             n_total,
             flush=True,
         )
+        print(
+            "n_C:",
+            n_C,
+            "and each proc will do",
+            n_C // mpi_size,
+            "of these",
+        )
         print(flush=True)
-    # return
 
-    from mpi4py import MPI
     MPI.COMM_WORLD.barrier()
 
     j_combos_1_arr = np.zeros(n_C, dtype=np.int32)
@@ -2185,16 +2214,6 @@ def compute_fn_20241214(
         index += 1
 
     # Now the main features:
-    # algorithm 2
-    if mpi_rank == 0:
-        print("Using algorithm 2")
-        print(
-            "n_C:",
-            n_C,
-            "and each proc will do",
-            n_C // mpi_size,
-            "of these",
-        )
     index_for_evaluator = (
         mpi_rank  # so the evaluator will always evaluate the cost function
     )
@@ -2246,6 +2265,10 @@ def compute_fn_20241214(
                         )
                     evaluator(reduction, final_name, index_for_evaluator)
                     index += 1
+
+    # Free up the large array U_F:
+    del U_F
+    win.free()
  
 
 
