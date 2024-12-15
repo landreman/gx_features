@@ -601,7 +601,7 @@ def try_every_feature(estimator, compute_fn, data, Y, fixed_features=None, verbo
     return results
 
 
-def sfs(estimator, compute_fn, data, Y, n_steps, fixed_features=None, verbose=1, scoring=None, filename=None):
+def sfs(estimator, compute_fn, data, Y, n_steps, fixed_features=None, verbose=1, scoring=None, filename=None, parismony=False, parsimony_margin=1e-4):
     start_time = time.time()
 
     if fixed_features is None:
@@ -626,6 +626,8 @@ def sfs(estimator, compute_fn, data, Y, n_steps, fixed_features=None, verbose=1,
         step_results = try_every_feature(
             estimator, compute_fn, data, Y, accumulated_features, verbose=verbose,
             scoring=scoring,
+            parismony=parismony,
+            parsimony_margin=parsimony_margin,
         )
         if proc0:
             best_feature = step_results["best_feature"]
