@@ -2,6 +2,7 @@ import unittest
 import numpy as np
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LinearRegression
 import xgboost as xgb
 
 from gx_features.calculations import compute_reductions
@@ -240,6 +241,29 @@ class Tests(unittest.TestCase):
                 np.testing.assert_equal(len(results["names"]), 11)
                 np.testing.assert_equal(results["best_feature_name"], "nfp")
                 np.testing.assert_equal(results["best_feature_index"], 7)
+
+    def test_skip_single_features_mpi(self):
+        data = load_all("20241005 small")
+        # Use iota as the target feature, so iota would be selected if skip_single_feature=False
+        index = data["scalars"].index("iota")
+        Y = data["scalar_feature_matrix"][:, index]
+
+        estimator = LinearRegression()
+
+        results = try_every_feature(estimator, compute_fn_20241106, data, Y, verbose=1, skip_single_features=False)
+        from mpi4py import MPI
+
+        if MPI.COMM_WORLD.Get_rank() == 0:
+            np.testing.assert_equal(len(results["names"]), 11)
+            np.testing.assert_equal(results["best_feature_name"], "iota")
+            np.testing.assert_equal(results["best_feature_index"], 8)
+
+        # Now repeat with skip_single_features=True:
+        results = try_every_feature(estimator, compute_fn_20241106, data, Y, verbose=1, skip_single_features=True)
+        if MPI.COMM_WORLD.Get_rank() == 0:
+            np.testing.assert_equal(len(results["names"]), 11)
+            np.testing.assert_equal(results["best_feature_name"], "max(cvdrift)")
+            np.testing.assert_equal(results["best_feature_index"], 2)
 
     def test_try_every_feature_Spearman_mpi(self):
         data = load_all("20241005 small")

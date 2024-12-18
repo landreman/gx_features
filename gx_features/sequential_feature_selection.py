@@ -63,7 +63,7 @@ def compute_fn_20241106(data, mpi_rank, mpi_size, evaluator):
     for j in range(n_scalars):
         evaluator(scalar_feature_matrix[:, j], scalars[j], index)
         index += 1
-        
+
 
 def reductions_20241107(arr, j, return_n_reductions=False):
     if return_n_reductions:
@@ -324,7 +324,7 @@ def compute_fn_20241115(data, mpi_rank, mpi_size, evaluator):
     assert z_functions[index] == "bmag"
 
     z_functions = meaningful_names(z_functions)
-    
+
     n_activation_functions = 5
     thresholds = np.arange(-1, 1.05, 0.1)
     n_thresholds = len(thresholds)
@@ -417,7 +417,18 @@ def compute_features_20241107():
     return results
 
 
-def try_every_feature(estimator, compute_fn, data, Y, fixed_features=None, verbose=1, scoring=None, parsimony=False, parsimony_margin=1e-4):
+def try_every_feature(
+    estimator,
+    compute_fn,
+    data,
+    Y,
+    fixed_features=None,
+    verbose=1,
+    scoring=None,
+    parsimony=False,
+    parsimony_margin=1e-4,
+    skip_single_features=False,
+):
     # To do later: backtracking?
 
     start_time = time.time()
@@ -440,6 +451,11 @@ def try_every_feature(estimator, compute_fn, data, Y, fixed_features=None, verbo
         score_str = scoring
 
     from mpi4py import MPI
+
+    features_to_skip = []
+    if skip_single_features:
+        # Never skip a/LT or a/Ln if they are available:
+        features_to_skip = [f for f in data["scalars"] if f not in ["a/LT", "a/Ln"]]
 
     comm = MPI.COMM_WORLD
     mpi_rank = comm.Get_rank()
@@ -486,9 +502,14 @@ def try_every_feature(estimator, compute_fn, data, Y, fixed_features=None, verbo
         if verbose > 1:
             print(f"[{mpi_rank}] index {index}: {name}, score: {score}", flush=True)
 
-        if (local_best_feature is None 
+        if ((
+            local_best_feature is None
             or score > local_best_score + parsimony_margin
-            or (parsimony and abs(score - local_best_score) <= parsimony_margin and len(name) < len(local_best_feature_name))
+            or (
+                parsimony
+                and abs(score - local_best_score) <= parsimony_margin
+                and len(name) < len(local_best_feature_name)
+            )) and (name not in features_to_skip)
         ):
             local_best_feature = feature
             local_best_feature_name = name
@@ -564,9 +585,7 @@ def try_every_feature(estimator, compute_fn, data, Y, fixed_features=None, verbo
 
     if verbose > 0:
         print("\n----- Results separated by MPI rank -----")
-        print(
-            f"best_scores: {best_scores}  best_score: {best_score}"
-        )
+        print(f"best_scores: {best_scores}  best_score: {best_score}")
         print(f"best_feature_names: {best_feature_names}")
         print(f"best_feature_name: {best_feature_name}")
         print(f"best_feature_indices: {best_feature_indices}")
@@ -601,7 +620,26 @@ def try_every_feature(estimator, compute_fn, data, Y, fixed_features=None, verbo
     return results
 
 
-def sfs(estimator, compute_fn, data, Y, n_steps, fixed_features=None, verbose=1, scoring=None, filename=None, parsimony=False, parsimony_margin=1e-4):
+def sfs(
+    estimator,
+    compute_fn,
+    data,
+    Y,
+    n_steps,
+    fixed_features=None,
+    verbose=1,
+    scoring=None,
+    filename=None,
+    parsimony=False,
+    parsimony_margin=1e-4,
+    skip_single_features=False,
+):
+    """
+    Perform sequential feature selection.
+    
+    If skip_single_feature=True, then the single features are still scored, but
+    they are not chosen as the best feature at any step.
+    """
     start_time = time.time()
 
     if fixed_features is None:
@@ -619,15 +657,28 @@ def sfs(estimator, compute_fn, data, Y, n_steps, fixed_features=None, verbose=1,
     R2s = np.zeros(n_steps)
     for j_step in range(n_steps):
         if verbose > 0 and proc0:
-            print(f"\n############### Sequential feature selection step {j_step + 1} of {n_steps} ###############")
+            print(
+                f"\n############### Sequential feature selection step {j_step + 1} of {n_steps} ###############"
+            )
             if j_step > 0:
-                print("Time since start:", (time.time() - start_time) / 60, "minutes", flush=True)
+                print(
+                    "Time since start:",
+                    (time.time() - start_time) / 60,
+                    "minutes",
+                    flush=True,
+                )
 
         step_results = try_every_feature(
-            estimator, compute_fn, data, Y, accumulated_features, verbose=verbose,
+            estimator,
+            compute_fn,
+            data,
+            Y,
+            accumulated_features,
+            verbose=verbose,
             scoring=scoring,
             parsimony=parsimony,
             parsimony_margin=parsimony_margin,
+            skip_single_features=skip_single_features,
         )
         if proc0:
             best_feature = step_results["best_feature"]
@@ -648,9 +699,16 @@ def sfs(estimator, compute_fn, data, Y, n_steps, fixed_features=None, verbose=1,
                 "\n############### Results of sequential feature selection: ###############"
             )
             for k_step in range(j_step + 1):
-                print(f"Step {k_step}  {results[0]['score_str']}={results[k_step]['best_score']:6.3g}  {results[k_step]['best_feature_name']}")
+                print(
+                    f"Step {k_step}  {results[0]['score_str']}={results[k_step]['best_score']:6.3g}  {results[k_step]['best_feature_name']}"
+                )
 
-            print("Total time taken:", (time.time() - start_time) / 60, "minutes", flush=True)
+            print(
+                "Total time taken:",
+                (time.time() - start_time) / 60,
+                "minutes",
+                flush=True,
+            )
 
         if proc0 and filename is not None:
             with open(filename, "wb") as f:
