@@ -2268,7 +2268,7 @@ def compute_fn_20241214(
 
     # Free up the large array U_F:
     del U_F
-    win.free()
+    win.Free()
  
 
 
