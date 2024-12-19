@@ -542,10 +542,18 @@ def try_every_feature(
         names += comm.recv(source=rank)
         scores += comm.recv(source=rank)
         indices += comm.recv(source=rank)
-        best_features.append(comm.recv(source=rank))
-        best_feature_names.append(comm.recv(source=rank))
-        best_feature_indices.append(comm.recv(source=rank))
-        best_scores.append(comm.recv(source=rank))
+        new_best_feature = comm.recv(source=rank)
+        new_best_feature_name = comm.recv(source=rank)
+        new_best_feature_index = comm.recv(source=rank)
+        new_best_score = comm.recv(source=rank)
+
+        # The info that just came in from comm.recv might be empty if that rank
+        # did not process any features.
+        if new_best_feature is not None:
+            best_features.append(new_best_feature)
+            best_feature_names.append(new_best_feature_name)
+            best_feature_indices.append(new_best_feature_index)
+            best_scores.append(new_best_score)
 
     permutation = np.argsort(indices)
     indices = np.array(indices)[permutation]
