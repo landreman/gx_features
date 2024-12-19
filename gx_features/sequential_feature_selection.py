@@ -486,7 +486,7 @@ def try_every_feature(
             if np.max(feature) == np.min(feature):
                 score = -1
             else:
-                score = spearmanr(feature, Y).statistic
+                score = abs(spearmanr(feature, Y).statistic)
         else:
             X = feature.reshape((-1, 1))
             if fixed_features is not None:
