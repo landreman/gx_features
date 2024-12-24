@@ -321,6 +321,10 @@ class Tests(unittest.TestCase):
             )
             if proc0:
                 for key in single_feature_results.keys():
+                    # Skip a few fields that were removed in SFS to save space
+                    if key in ["names", "best_features"]:
+                        continue
+
                     print(
                         "Comparing",
                         key,
