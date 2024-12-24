@@ -688,24 +688,24 @@ def sfs(
             parsimony_margin=parsimony_margin,
             skip_single_features=skip_single_features,
         )
-        # Remove some huge items that don't need to be saved:
-        step_results.pop("best_features")
-        all_names = step_results.pop("names")  # This array is the same each step so just save it once, not each step
-
         if proc0:
+            # Remove some huge items that don't need to be saved:
+            step_results.pop("best_features")
+            all_names = step_results.pop("names")  # This array is the same each step so just save it once, not each step
+
             best_feature = step_results["best_feature"]
             accumulated_features = np.concatenate(
                 [accumulated_features, best_feature.reshape((-1, 1))], axis=1
             )
             step_results["accumulated_features"] = accumulated_features
             results[j_step] = step_results
+            results["all_names"] = all_names
             best_feature_names.append(step_results["best_feature_name"])
             R2s[j_step] = step_results["best_score"]
 
         results["best_feature_names"] = best_feature_names
         results["R2s"] = R2s
         results["n_steps"] = j_step + 1
-        results["all_names"] = all_names
 
         if verbose > 0 and proc0:
             print(
