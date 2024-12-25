@@ -2085,9 +2085,9 @@ def unary_funcs_20241225(
         add_amount = adds[i]
         arr_out = arr_in + add_amount
         if add_amount < 0:
-            name_out = f"{name_in} - {-add_amount}"
+            name_out = f"({name_in} - {-add_amount})"
         else:
-            name_out = f"{name_in} + {add_amount}"
+            name_out = f"({name_in} + {add_amount})"
     else:
         raise RuntimeError("Should not get here")
 
