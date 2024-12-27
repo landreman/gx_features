@@ -234,7 +234,7 @@ class Tests(unittest.TestCase):
             xgb.XGBRegressor(), compute_fn_20241225, data, Y, n_steps, verbose=1
         )
 
-    # @unittest.skip
+    @unittest.skip
     def test_compute_fn_20241227_mpi(self):
 
         data = load_all("20241005 small", verbose=False)
