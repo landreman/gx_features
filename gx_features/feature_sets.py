@@ -2099,6 +2099,104 @@ def unary_funcs_20241225(
     return arr_out, name_out
 
 
+def unary_funcs_20241227(
+    index, 
+    arr_in, 
+    name_in, 
+    bmag,
+    powers=[-1, 2], 
+    rolls=[],
+    adds=[],
+    return_n_unary=False
+):
+    # In the future we could also add shifts before Heaviside/ReLU.
+
+    # The indefinite integral is another option, but the choice of
+    # which z to start at breaks translation invariance.
+    n_unitary_operations_besides_powers = 9
+    n_powers = len(powers)
+    n_rolls = len(rolls)
+    n_adds = len(adds)
+    if return_n_unary:
+        return n_unitary_operations_besides_powers + n_powers + n_rolls + n_adds, n_rolls
+
+    power_strings = {
+        -1: "⁻¹",
+        2: "²",
+    }
+    if index == 0:
+        # Identity
+        arr_out = arr_in
+        name_out = name_in
+    elif index == 1:
+        # Absolute value
+        arr_out = np.abs(arr_in)
+        name_out = f"|{name_in}|"
+    elif index == 2:
+        # Derivative
+        arr_out = differentiate(arr_in)
+        name_out = f"∂({name_in})"
+    elif index == 3:
+        arr_out = np.heaviside(arr_in, 0)
+        name_out = f"Heaviside({name_in})"
+    elif index == 4:
+        arr_out = np.heaviside(-arr_in, 0)
+        name_out = f"Heaviside(-{name_in})"
+    elif index == 5:
+        arr_out = np.where(arr_in > 0, arr_in, 0)
+        name_out = f"ReLU({name_in})"
+    elif index == 6:
+        arr_out = np.where(-arr_in > 0, -arr_in, 0)
+        name_out = f"ReLU(-{name_in})"
+    elif index == 7:
+        arr_out = arr_in * bmag
+        name_out = name_in + " B"
+    elif index == 8:
+        arr_out = arr_in / bmag
+        name_out = name_in + " B⁻¹"
+    elif (
+        index >= n_unitary_operations_besides_powers
+        and index < n_unitary_operations_besides_powers + n_powers
+    ):
+        power = powers[index - n_unitary_operations_besides_powers]
+        if power < 0 and np.any(arr_in == 0):
+            # Avoid division by zero
+            arr_out = np.full_like(arr_in, np.nan)
+        else:
+            arr_out = arr_in**power
+
+        name_out = f"({name_in}){power_strings[power]}"
+    elif (
+        index >= n_unitary_operations_besides_powers + n_powers
+        and index < n_unitary_operations_besides_powers + n_powers + n_rolls
+    ):
+        i = index - n_unitary_operations_besides_powers - n_powers
+        roll_amount = rolls[i]
+        roll_amount_int = int(roll_amount * arr_in.shape[1])
+        arr_out = np.roll(arr_in, roll_amount_int, axis=1)
+        name_out = f"roll{roll_amount}({name_in})"
+    elif (
+        index >= n_unitary_operations_besides_powers + n_powers + n_rolls
+        and index < n_unitary_operations_besides_powers + n_powers + n_rolls + n_adds
+    ):
+        i = index - n_unitary_operations_besides_powers - n_powers - n_rolls
+        add_amount = adds[i]
+        arr_out = arr_in + add_amount
+        if add_amount < 0:
+            name_out = f"({name_in} - {-add_amount})"
+        else:
+            name_out = f"({name_in} + {add_amount})"
+    else:
+        raise RuntimeError("Should not get here")
+
+    # If the operation doesn't do anything, and we aren't explicitly asking for
+    # the identity function, return NaN so the superfluous function is not considered.
+    if index > 0 and np.array_equal(arr_in, arr_out):
+        arr_out = np.full_like(arr_in, np.nan)
+
+    return arr_out, name_out
+
+
 def reductions_20241214(
     arr,
     j,
@@ -2238,6 +2336,88 @@ def reductions_20241225(
         return new_features[:, 1], "argmaxKpar"
 
     elif j == 9:
+        return np.sum(np.abs(arr), axis=1), "L₁Norm"
+
+    elif j in range(n_reductions_before_lists, n_reductions_before_lists + n_quantiles):
+        q = quantiles[j - n_reductions_before_lists]
+        return np.quantile(arr, q, axis=1), f"quantile{q}"
+
+    elif j in range(n_reductions_before_lists + n_quantiles, n_reductions_before_lists + n_quantiles + n_count_above):
+        i = j - n_reductions_before_lists - n_quantiles
+        return np.mean(arr > count_above[i], axis=1), f"countAbove{count_above[i]}"
+
+    elif j in range(
+        n_reductions_before_lists + n_quantiles + n_count_above,
+        n_reductions_before_lists + n_quantiles + n_count_above + n_fft_coefficients,
+    ):
+        abs_fft_result = np.abs(np.fft.fft(arr, axis=1))
+        i = j - n_reductions_before_lists - n_quantiles - n_count_above
+        return (
+            abs_fft_result[:, fft_coefficients[i]],
+            f"absFFTCoeff{fft_coefficients[i]}",
+        )
+    
+    else:
+        raise ValueError(f"Invalid reduction index: {j}")
+
+
+def reductions_20241227(
+    arr,
+    j,
+    quantiles=[0.1, 0.25, 0.75, 0.9],
+    count_above=[-2, -1, 0, 1, 2],
+    fft_coefficients=[1, 2, 3],
+    return_n_reductions=False,
+):
+    n_quantiles = len(quantiles)
+    n_count_above = len(count_above)
+    n_fft_coefficients = len(fft_coefficients)
+    n_reductions_before_lists = 11
+    n_reductions = n_reductions_before_lists + n_quantiles + n_count_above + n_fft_coefficients
+    if return_n_reductions:
+        return n_reductions
+
+    if j == 0:
+        return arr.max(axis=1), "max"
+
+    elif j == 1:
+        return arr.min(axis=1), "min"
+
+    elif j == 2:
+        return arr.max(axis=1) - arr.min(axis=1), "maxMinusMin"
+
+    elif j == 3:
+        return arr.mean(axis=1), "mean"
+
+    elif j == 4:
+        return np.median(arr, axis=1), "median"
+
+    elif j == 5:
+        return np.mean(arr**2, axis=1), "meanSquare"
+
+    elif j == 6:
+        return np.var(arr, axis=1), "variance"
+
+    elif j == 7:
+        if np.any(np.max(arr, axis=1) - np.min(arr, axis=1) < 1e-13):
+            # skewness is not defined for a constant array
+            return np.zeros(arr.shape[0]), "skewness"
+        else:
+            return np.nan_to_num(skew(arr, axis=1, bias=False)), "skewness"
+
+    elif j == 8:
+        new_features, kpar_names = compute_mean_k_parallel(
+            arr.reshape((arr.shape[0], arr.shape[1], 1)), [""], include_argmax=False
+        )
+        return new_features[:, 0], "meanKpar"
+
+    elif j == 9:
+        new_features, kpar_names = compute_mean_k_parallel(
+            arr.reshape((arr.shape[0], arr.shape[1], 1)), [""], include_argmax=True
+        )
+        return new_features[:, 1], "argmaxKpar"
+
+    elif j == 10:
         return np.sum(np.abs(arr), axis=1), "L₁Norm"
 
     elif j in range(n_reductions_before_lists, n_reductions_before_lists + n_quantiles):
@@ -2464,6 +2644,22 @@ def compute_fn_20241225(
         evaluator,
         unary_func=unary_funcs_20241225,
         reductions_func=reductions_20241225,
+        n_B_powers=1,
+    )
+    
+def compute_fn_20241227(
+    data,
+    mpi_rank,
+    mpi_size,
+    evaluator,
+):
+    return compute_fn_20241214(
+        data,
+        mpi_rank,
+        mpi_size,
+        evaluator,
+        unary_func=unary_funcs_20241227,
+        reductions_func=reductions_20241227,
         n_B_powers=1,
     )
     
