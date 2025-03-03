@@ -275,6 +275,16 @@ class Tests(unittest.TestCase):
         if MPI.COMM_WORLD.Get_rank() == 0:
             np.testing.assert_equal(len(results["names"]), 57270)
 
+    def test_try_every_feature_Kendall_mpi(self):
+        data = load_all("20241005 small")
+        Y = data["Y"]
+
+        results = try_every_feature("Kendall", compute_fn_20241108, data, Y, verbose=1)
+        from mpi4py import MPI
+
+        if MPI.COMM_WORLD.Get_rank() == 0:
+            np.testing.assert_equal(len(results["names"]), 57270)
+
     def test_try_every_feature_20241211_mpi(self):
         data = load_all("20241005 small")
         Y = data["Y"]

@@ -4,7 +4,7 @@
 import time
 import pickle
 import numpy as np
-from scipy.stats import skew, spearmanr
+from scipy.stats import skew, spearmanr, kendalltau
 from sklearn.model_selection import cross_val_score, KFold
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
@@ -440,7 +440,11 @@ def try_every_feature(
         assert fixed_features.ndim == 2
 
     if estimator == "Spearman":
-        score_str = "C"
+        score_str = "ρ"
+        assert fixed_features is None
+        assert scoring is None
+    elif estimator == "Kendall":
+        score_str = "τ"
         assert fixed_features is None
         assert scoring is None
     elif scoring is None and estimator._estimator_type == "regressor":
@@ -487,6 +491,11 @@ def try_every_feature(
                 score = -1
             else:
                 score = abs(spearmanr(feature, Y).statistic)
+        elif estimator == "Kendall":
+            if np.max(feature) == np.min(feature):
+                score = -1
+            else:
+                score = abs(kendalltau(feature, Y, method="asymptotic").statistic)
         else:
             X = feature.reshape((-1, 1))
             if fixed_features is not None:
